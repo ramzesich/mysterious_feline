@@ -16,7 +16,7 @@ let catX = 50;
 let catY = 0;
 let velocityY = 0;
 let isGrounded = true;
-let score = 0;
+let score = 0; // Acts as our battery fuel ammo clip counter
 let gameActive = true;
 let faceDirection = 1; 
 
@@ -72,6 +72,9 @@ function generateLevel() {
     RuntimeEntities = [];
     PigeonEntities = [];
 
+    // Ensure our dialogue node is initialized with the updated line string
+    meowBubble.innerText = "I am Bumbot!!!";
+
     levelObjects.forEach((obj, index) => {
         const element = document.createElement('div');
         element.id = "ent-" + index;
@@ -102,7 +105,7 @@ function generateLevel() {
     pigeonSpawns.forEach((pig) => {
         const element = document.createElement('div');
         element.classList.add('pigeon');
-        element.innerText = '🐦';
+        element.innerText = '🕊️'; // CHANGED: Native flying pigeon asset
         element.style.left = pig.x + 'px';
         element.style.bottom = pig.y + 'px';
         world.appendChild(element);
@@ -115,23 +118,64 @@ function generateLevel() {
     });
 }
 function triggerSonicMeow() {
-    playAudioTone(300, 'sawtooth', 0.15);
-    playAudioTone(600, 'triangle', 0.2);
-    meowBubble.style.display = 'block';
-    setTimeout(() => { meowBubble.style.display = 'none'; }, 600);
+    // Ammo verification check: Reject input loop if Bumbot doesn't hold battery fuel
+    if (score <= 0) {
+        playAudioTone(150, 'sine', 0.1); // Small error note bleep
+        return;
+    }
 
+    // Deduct ammo charge and update tracking dashboard UI
+    score--;
+    energyDisplay.innerText = "Batteries: " + score;
+
+    // Intense apocalyptic sonic blast sequence sound profile
+    playAudioTone(200, 'sawtooth', 0.4);
+    playAudioTone(400, 'square', 0.4);
+    playAudioTone(800, 'triangle', 0.5);
+    
+    meowBubble.style.display = 'block';
+    // CHANGED: Holds dialogue panel view space open for 1600ms (1 full second longer)
+    setTimeout(() => { meowBubble.style.display = 'none'; }, 1600);
+
+    // Compute Viewport Area boundaries currently active over player frame coordinate tracking
+    let currentCameraX = catX - (windowWidth / 2) + 25;
+    if (currentCameraX < 0) currentCameraX = 0;
+    if (currentCameraX > worldWidth - windowWidth) currentCameraX = worldWidth - windowWidth;
+    
+    let viewLeftBound = currentCameraX;
+    let viewRightBound = currentCameraX + windowWidth;
+
+    // Screen Wipe: Locate all active structural pillars and threat entities visible inside window boundary limits
     RuntimeEntities.forEach(ent => {
-        if (ent.type !== 'pillar' || !ent.active) return;
-        let distance = ent.x - catX;
-        let withinRange = false;
-        if (faceDirection === 1 && distance > 0 && distance < 120) withinRange = true;
-        if (faceDirection === -1 && distance < 0 && distance > -120) withinRange = true;
-        if (withinRange) {
+        if (!ent.active || (ent.type !== 'pillar' && ent.type !== 'spike')) return;
+        
+        // Bounding box screen space location check
+        if (ent.x >= viewLeftBound - 40 && ent.x <= viewRightBound) {
             ent.active = false;
-            ent.dom.style.transform = "scale(0)";
-            ent.dom.style.transition = "transform 0.2s ease-out";
-            setTimeout(() => ent.dom.remove(), 200);
-            playAudioTone(150, 'square', 0.3); 
+            
+            // Step 1: Inject fracturing overlay structural line elements instantly
+            const crackLayer = document.createElement('div');
+            crackLayer.classList.add('cracked');
+            ent.dom.appendChild(crackLayer);
+            
+            // Step 2: Trigger breaking decay delay profile logic across DOM elements
+            ent.dom.style.transition = "transform 0.4s cubic-bezier(0.36, 0.07, 0.19, 0.97), opacity 0.4s ease-out";
+            ent.dom.style.transform = "scale(0) rotate(" + (Math.random() * 30 - 15) + "deg)";
+            ent.dom.style.opacity = "0";
+
+            setTimeout(() => ent.dom.remove(), 400);
+            playAudioTone(120, 'sawtooth', 0.2); 
+        }
+    });
+
+    // Also blast away visible pigeons
+    PigeonEntities.forEach(pig => {
+        if (pig.x >= viewLeftBound && pig.x <= viewRightBound) {
+            pig.x = -9999; // Teleport out of collision universe
+            pig.dom.style.transition = "transform 0.3s ease-out, opacity 0.3s ease-out";
+            pig.dom.style.transform = "translateY(-50px) scale(0)";
+            pig.dom.style.opacity = "0";
+            setTimeout(() => pig.dom.remove(), 300);
         }
     });
 }
