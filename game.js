@@ -117,27 +117,51 @@ function generateLevel() {
         });
     });
 }
+let activeParticles = [];
+
+function createShatterBurst(originX, originY, obstacleHeight) {
+    // Generate 15 individual flying debris vectors distributed vertically over the obstacle's original height
+    for (let i = 0; i < 15; i++) {
+        const pElement = document.createElement('div');
+        pElement.classList.add('rubble-particle');
+        
+        // Randomly scatter start coordinates inside the target obstacle's frame space
+        let startX = originX + (Math.random() * 40);
+        let startY = (Math.random() * obstacleHeight);
+        
+        pElement.style.left = startX + 'px';
+        pElement.style.bottom = (40 + startY) + 'px';
+        world.appendChild(pElement);
+        
+        // Initialize independent directional trajectory velocities
+        activeParticles.push({
+            dom: pElement,
+            x: startX,
+            y: startY,
+            vx: (Math.random() * 8 - 4), // Left or right spray velocity
+            vy: (Math.random() * 6 + 4),  // Initial upward explosion velocity kick
+            alpha: 1,
+            life: 1.0 // Fades out completely over 1 second
+        });
+    }
+}
+
 function triggerSonicMeow() {
-    // Ammo verification check: Reject input loop if Bumbot doesn't hold battery fuel
     if (score <= 0) {
-        playAudioTone(150, 'sine', 0.1); // Small error note bleep
+        playAudioTone(150, 'sine', 0.1); 
         return;
     }
 
-    // Deduct ammo charge and update tracking dashboard UI
     score--;
     energyDisplay.innerText = "Batteries: " + score;
 
-    // Intense apocalyptic sonic blast sequence sound profile
     playAudioTone(200, 'sawtooth', 0.4);
     playAudioTone(400, 'square', 0.4);
     playAudioTone(800, 'triangle', 0.5);
     
     meowBubble.style.display = 'block';
-    // CHANGED: Holds dialogue panel view space open for 1600ms (1 full second longer)
     setTimeout(() => { meowBubble.style.display = 'none'; }, 1600);
 
-    // Compute Viewport Area boundaries currently active over player frame coordinate tracking
     let currentCameraX = catX - (windowWidth / 2) + 25;
     if (currentCameraX < 0) currentCameraX = 0;
     if (currentCameraX > worldWidth - windowWidth) currentCameraX = worldWidth - windowWidth;
@@ -145,20 +169,19 @@ function triggerSonicMeow() {
     let viewLeftBound = currentCameraX;
     let viewRightBound = currentCameraX + windowWidth;
 
-    // Screen Wipe: Locate all active structural pillars and threat entities visible inside window boundary limits
     RuntimeEntities.forEach(ent => {
         if (!ent.active || (ent.type !== 'pillar' && ent.type !== 'spike')) return;
         
-        // Bounding box screen space location check
         if (ent.x >= viewLeftBound - 40 && ent.x <= viewRightBound) {
             ent.active = false;
             
-            // Step 1: Inject fracturing overlay structural line elements instantly
+            // NEW: Instantly deploy a geometric burst vector profile using the obstacle's coordinates
+            createShatterBurst(ent.x, 0, ent.height || 40);
+
             const crackLayer = document.createElement('div');
             crackLayer.classList.add('cracked');
             ent.dom.appendChild(crackLayer);
             
-            // Step 2: Trigger breaking decay delay profile logic across DOM elements
             ent.dom.style.transition = "transform 0.4s cubic-bezier(0.36, 0.07, 0.19, 0.97), opacity 0.4s ease-out";
             ent.dom.style.transform = "scale(0) rotate(" + (Math.random() * 30 - 15) + "deg)";
             ent.dom.style.opacity = "0";
@@ -168,10 +191,11 @@ function triggerSonicMeow() {
         }
     });
 
-    // Also blast away visible pigeons
     PigeonEntities.forEach(pig => {
         if (pig.x >= viewLeftBound && pig.x <= viewRightBound) {
-            pig.x = -9999; // Teleport out of collision universe
+            // Also spray dust when a flying drone vaporizes
+            createShatterBurst(pig.x, pig.y - 40, 20);
+            pig.x = -9999;
             pig.dom.style.transition = "transform 0.3s ease-out, opacity 0.3s ease-out";
             pig.dom.style.transform = "translateY(-50px) scale(0)";
             pig.dom.style.opacity = "0";
@@ -318,6 +342,25 @@ function update() {
         if (pig.x >= pig.rightBound) pig.dir = -1;
         if (pig.x <= pig.leftBound) pig.dir = 1;
     });
+
+    // NEW: Update active debris particle positions and apply gravity modifiers
+    for (let i = activeParticles.length - 1; i >= 0; i--) {
+        let p = activeParticles[i];
+        p.vy -= 0.3; // Particle gravity pull downward down
+        p.x += p.vx;
+        p.y += p.vy;
+        p.life -= 0.02; // Age particle decay ticks
+        
+        p.dom.style.left = p.x + 'px';
+        p.dom.style.bottom = (40 + p.y) + 'px';
+        p.dom.style.opacity = p.life;
+
+        // Clean up aged particle layers out of the DOM universe
+        if (p.life <= 0 || p.y < -40) {
+            p.dom.remove();
+            activeParticles.splice(i, 1);
+        }
+    }
 
     handleOverlapSystems();
 
