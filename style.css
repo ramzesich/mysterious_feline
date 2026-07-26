@@ -210,17 +210,46 @@ button:hover { background: #27ae60; }
 }
 #farBuildings {
     position: absolute;
-    bottom: 40px; left: 0; width: 300%; height: 160px;
-    background: repeating-linear-gradient(90deg, #1c133a 0px, #1c133a 40px, transparent 40px, transparent 70px);
-    opacity: 0.4;
+    bottom: 40px; left: 0; width: 400%; height: 180px;
+    /* Varied cityscape: Layered silhouettes mimicking towers and cooling stacks */
+    background: 
+        linear-gradient(90deg, #161033 0px, #161033 60px, transparent 60px, transparent 130px, #1c133a 130px, #1c133a 210px, transparent 210px),
+        repeating-linear-gradient(90deg, #120d2b 0px, #120d2b 45px, transparent 45px, transparent 90px);
+    opacity: 0.45;
     z-index: 2;
 }
 #nearBuildings {
     position: absolute;
-    bottom: 40px; left: 0; width: 500%; height: 220px;
-    background: repeating-linear-gradient(90deg, #0e0a22 0px, #0e0a22 60px, transparent 60px, transparent 110px);
-    opacity: 0.75;
+    bottom: 40px; left: 0; width: 600%; height: 240px;
+    /* Varied blocks with synthetic neon window grids using a repeating tile mask */
+    background: 
+        linear-gradient(90deg, #0e0a22 0px, #0e0a22 90px, transparent 90px, transparent 160px, #080616 160px, #080616 260px, transparent 260px),
+        repeating-linear-gradient(transparent 0px, transparent 12px, rgba(0, 240, 255, 0.15) 12px, rgba(0, 240, 255, 0.15) 18px),
+        repeating-linear-gradient(90deg, #0a071b 0px, #0a071b 55px, transparent 55px, transparent 110px);
+    opacity: 0.85;
     z-index: 3;
+}
+#extractionPad {
+    position: absolute;
+    bottom: 40px;
+    left: 7770px; /* Aligned right beneath the 7800px portal core center */
+    width: 120px;
+    height: 12px;
+    background: #2b2b2b;
+    border-top: 4px solid #00f0ff; /* Cyberpunk cyan glow accent strip */
+    box-shadow: 0px -4px 15px rgba(0, 240, 255, 0.7);
+    border-radius: 2px;
+    z-index: 6;
+}
+.rubble-particle {
+    position: absolute;
+    width: 6px;
+    height: 6px;
+    background: #e74c3c;
+    border: 1px solid #c0392b;
+    border-radius: 1px;
+    pointer-events: none;
+    z-index: 25;
 }
 
 #world { z-index: 5; }
