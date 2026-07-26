@@ -106,11 +106,14 @@ body {
     line-height: 25px;
     text-align: center;
     user-select: none;
-    /* Draws a row of sharp metal teeth pointing upwards */
-    content: "▲▲▲"; 
     color: #7f8c8d;
     text-shadow: 1px 1px 0px #fff, -1px -1px 0px #000;
     font-weight: bold;
+    z-index: 11;
+}
+.spike::before {
+    content: "▲▲▲";
+    display: block;
 }
 
 @keyframes bumbotShake {
