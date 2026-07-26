@@ -16,7 +16,7 @@ let catX = 50;
 let catY = 0;
 let velocityY = 0;
 let isGrounded = true;
-let score = 0; // Acts as our battery fuel ammo clip counter
+let score = 1; // Acts as our battery fuel ammo clip counter
 let gameActive = true;
 let faceDirection = 1; 
 
