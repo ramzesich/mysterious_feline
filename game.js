@@ -446,8 +446,10 @@ function update() {
 }
 
 function resetGame() {
-    catX = 50; catY = 0; velocityY = 0; isGrounded = true; score = 0; gameActive = true;
-    energyDisplay.innerText = "Batteries: 0";
+    catX = 50; catY = 0; velocityY = 0; isGrounded = true; 
+    score = 1; // FIXED: Restores your initial emergency blast charge on death/replay resets
+    gameActive = true;
+    energyDisplay.innerText = "Batteries: " + score;
     winScreen.style.display = 'none';
     generateLevel();
     requestAnimationFrame(update);
