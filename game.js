@@ -175,16 +175,15 @@ function triggerSonicMeow() {
     meowBubble.style.display = 'block';
     setTimeout(() => { meowBubble.style.display = 'none'; }, 1600);
 
-    // NEW: Spawn the Sonic Ripple Shockwave Element
     const ripple = document.createElement('div');
     ripple.classList.add('sonic-ripple');
 
     // Calculate the absolute center pixel position of Bumbot
-    let spawnX = catX + 25; // Cat is 50px wide
-    let spawnY = catY + 21; // Cat container height is roughly 42px
+    let spawnX = catX + 25;
+    let spawnTop = 310 - catY - 21;
 
     ripple.style.left = spawnX + 'px';
-    ripple.style.bottom = (40 + spawnY) + 'px'; // Base offset + height
+    ripple.style.top = spawnTop + 'px';
     world.appendChild(ripple);
 
     // Automatically delete the ripple node from the DOM once the animation ends
