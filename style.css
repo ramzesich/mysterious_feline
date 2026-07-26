@@ -61,7 +61,7 @@ body {
     line-height: 42px; /* Tight line height overrides text box centering and lowers the emoji */
     text-align: center;
     user-select: none;
-    transform: scaleX(-1); 
+    transform: scaleX(-1);
     display: block; /* Forces clean geometric drawing bounds rather than character spacing */
     filter: brightness(0) drop-shadow(1px 0px 0px white) drop-shadow(-1px 0px 0px white) drop-shadow(0px 1px 0px white) drop-shadow(0px -1px 0px white);
 }
@@ -214,7 +214,7 @@ button:hover { background: #27ae60; }
 #farBuildings {
     position: absolute;
     bottom: 40px; left: 0; width: 100%; height: 180px; /* Changed width to 100% since repeat handles the rest */
-    background: 
+    background:
         linear-gradient(90deg, #161033 0px, #161033 70px, transparent 70px, transparent 150px, #1c133a 150px, #1c133a 260px, transparent 260px),
         linear-gradient(90deg, #130e2e 0px, #130e2e 110px, transparent 110px, transparent 200px, #150f35 200px, #150f35 340px, transparent 340px);
     background-repeat: repeat-x; /* FIXED: City elements will now repeat forever */
@@ -225,7 +225,7 @@ button:hover { background: #27ae60; }
 #nearBuildings {
     position: absolute;
     bottom: 40px; left: 0; width: 100%; height: 240px;
-    background: 
+    background:
         linear-gradient(90deg, #0e0a22 0px, #0e0a22 90px, transparent 90px, transparent 210px, #0a071b 210px, #0a071b 330px, transparent 330px),
         linear-gradient(90deg, #0b081c 0px, #0b081c 140px, transparent 140px, transparent 280px, #110d29 280px, #110d29 400px, transparent 400px);
     background-repeat: repeat-x; /* FIXED: City elements will now repeat forever */
@@ -242,10 +242,10 @@ button:hover { background: #27ae60; }
     pointer-events: none;
     z-index: 9;
 }
-#world { 
+#world {
     position: absolute;
     top: 0; left: 0; width: 8000px; height: 100%;
-    z-index: 10; 
+    z-index: 10;
 }
 #extractionPad {
     position: absolute;
@@ -285,7 +285,7 @@ button:hover { background: #27ae60; }
     width: 100%;
     height: 100%;
     top: 0; left: 0;
-    background-image: 
+    background-image:
         linear-gradient(45deg, transparent 45%, rgba(255,255,255,0.6) 48%, rgba(255,255,255,0.6) 52%, transparent 55%),
         linear-gradient(-30deg, transparent 40%, rgba(255,255,255,0.6) 44%, rgba(255,255,255,0.6) 48%, transparent 52%);
     pointer-events: none;
@@ -306,4 +306,34 @@ button:hover { background: #27ae60; }
 @keyframes neonPulse {
     0% { opacity: 0.4; transform: scale(0.9); }
     100% { opacity: 0.95; transform: scale(1.1); }
+}
+
+.sonic-ripple {
+    position: absolute;
+    width: 60px;
+    height: 60px;
+    border: 4px solid #00f0ff;
+    /* Glowing cyan edge */
+    border-radius: 50%;
+    pointer-events: none;
+    z-index: 8;
+    transform: translate(-50%, -50%);
+    /* Centers the ring perfectly on spawn */
+    box-shadow: 0 0 15px #00f0ff, inset 0 0 15px #00f0ff;
+    animation: rippleExpand 0.6s cubic-bezier(0.1, 0.8, 0.3, 1) forwards;
+}
+
+@keyframes rippleExpand {
+    0% {
+        width: 10px;
+        height: 10px;
+        opacity: 1;
+    }
+
+    100% {
+        width: 750px;
+        /* Expands slightly past the full game window width */
+        height: 750px;
+        opacity: 0;
+    }
 }

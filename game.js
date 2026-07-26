@@ -18,7 +18,7 @@ let velocityY = 0;
 let isGrounded = true;
 let score = 1; // Acts as our battery fuel ammo clip counter
 let gameActive = true;
-let faceDirection = 1; 
+let faceDirection = 1;
 
 const moveSpeed = 5;
 const gravity = 0.6;
@@ -42,7 +42,7 @@ function playAudioTone(freq, type, duration) {
 window.addEventListener('keydown', (e) => {
     if (!gameActive) return;
     if (e.key === 'ArrowLeft' || e.key === 'ArrowRight' || e.key === 'ArrowUp' || e.code === 'Space') {
-        e.preventDefault(); 
+        e.preventDefault();
         const keyName = e.code === 'Space' ? 'Space' : e.key;
         keys[keyName] = true;
     }
@@ -80,7 +80,7 @@ function generateLevel() {
     levelObjects.forEach((obj, index) => {
         const element = document.createElement('div');
         element.id = "ent-" + index;
-        
+
         if (obj.type === 'pillar') {
             element.classList.add('obstacle');
             element.style.left = obj.x + 'px';
@@ -105,9 +105,9 @@ function generateLevel() {
             element.style.left = obj.x + 'px';
             element.style.bottom = (40 + obj.height) + 'px';
         }
-        
+
         world.appendChild(element);
-        
+
         // Ignore arrows in active solid collision computation engines
         if (obj.type !== 'arrow') {
             RuntimeEntities.push({ ...obj, dom: element, active: true });
@@ -137,15 +137,15 @@ function createShatterBurst(originX, originY, obstacleHeight) {
     for (let i = 0; i < 15; i++) {
         const pElement = document.createElement('div');
         pElement.classList.add('rubble-particle');
-        
+
         // Randomly scatter start coordinates inside the target obstacle's frame space
         let startX = originX + (Math.random() * 40);
         let startY = (Math.random() * obstacleHeight);
-        
+
         pElement.style.left = startX + 'px';
         pElement.style.bottom = (40 + startY) + 'px';
         world.appendChild(pElement);
-        
+
         // Initialize independent directional trajectory velocities
         activeParticles.push({
             dom: pElement,
@@ -161,7 +161,7 @@ function createShatterBurst(originX, originY, obstacleHeight) {
 
 function triggerSonicMeow() {
     if (score <= 0) {
-        playAudioTone(150, 'sine', 0.1); 
+        playAudioTone(150, 'sine', 0.1);
         return;
     }
 
@@ -171,42 +171,58 @@ function triggerSonicMeow() {
     playAudioTone(200, 'sawtooth', 0.4);
     playAudioTone(400, 'square', 0.4);
     playAudioTone(800, 'triangle', 0.5);
-    
+
     meowBubble.style.display = 'block';
     setTimeout(() => { meowBubble.style.display = 'none'; }, 1600);
 
+    // NEW: Spawn the Sonic Ripple Shockwave Element
+    const ripple = document.createElement('div');
+    ripple.classList.add('sonic-ripple');
+
+    // Calculate the absolute center pixel position of Bumbot
+    let spawnX = catX + 25; // Cat is 50px wide
+    let spawnY = catY + 21; // Cat container height is roughly 42px
+
+    ripple.style.left = spawnX + 'px';
+    ripple.style.bottom = (40 + spawnY) + 'px'; // Base offset + height
+    world.appendChild(ripple);
+
+    // Automatically delete the ripple node from the DOM once the animation ends
+    setTimeout(() => ripple.remove(), 600);
+
+    // Dynamic viewport boundary limits calculation
     let currentCameraX = catX - (windowWidth / 2) + 25;
     if (currentCameraX < 0) currentCameraX = 0;
     if (currentCameraX > worldWidth - windowWidth) currentCameraX = worldWidth - windowWidth;
-    
+
     let viewLeftBound = currentCameraX;
     let viewRightBound = currentCameraX + windowWidth;
 
+    // Core screen-clearing logic for pillars and spikes
     RuntimeEntities.forEach(ent => {
         if (!ent.active || (ent.type !== 'pillar' && ent.type !== 'spike')) return;
-        
+
         if (ent.x >= viewLeftBound - 40 && ent.x <= viewRightBound) {
             ent.active = false;
-            
-            // NEW: Instantly deploy a geometric burst vector profile using the obstacle's coordinates
+
             createShatterBurst(ent.x, 0, ent.height || 40);
 
             const crackLayer = document.createElement('div');
             crackLayer.classList.add('cracked');
             ent.dom.appendChild(crackLayer);
-            
+
             ent.dom.style.transition = "transform 0.4s cubic-bezier(0.36, 0.07, 0.19, 0.97), opacity 0.4s ease-out";
             ent.dom.style.transform = "scale(0) rotate(" + (Math.random() * 30 - 15) + "deg)";
             ent.dom.style.opacity = "0";
 
             setTimeout(() => ent.dom.remove(), 400);
-            playAudioTone(120, 'sawtooth', 0.2); 
+            playAudioTone(120, 'sawtooth', 0.2);
         }
     });
 
+    // Also blast away visible pigeons
     PigeonEntities.forEach(pig => {
         if (pig.x >= viewLeftBound && pig.x <= viewRightBound) {
-            // Also spray dust when a flying drone vaporizes
             createShatterBurst(pig.x, pig.y - 40, 20);
             pig.x = -9999;
             pig.dom.style.transition = "transform 0.3s ease-out, opacity 0.3s ease-out";
@@ -218,7 +234,7 @@ function triggerSonicMeow() {
 }
 
 function checkSolidCollision(targetX, targetY) {
-    const catWidth = 35; 
+    const catWidth = 35;
     const catHeight = 45;
     for (let obj of RuntimeEntities) {
         if (!obj.active || obj.type === 'spike' || obj.type === 'battery') continue;
@@ -269,7 +285,7 @@ function handleOverlapSystems() {
                 obj.dom.remove();
                 score++;
                 energyDisplay.innerText = "Batteries: " + score;
-                playAudioTone(880, 'sine', 0.08); 
+                playAudioTone(880, 'sine', 0.08);
             }
         }
     });
@@ -277,31 +293,31 @@ function handleOverlapSystems() {
 
 function triggerShortCircuitReset() {
     if (!gameActive) return;
-    
+
     // Step 1: Lock player controls and physics instantly
     gameActive = false;
-    
+
     // Step 2: Trigger heavy static electrical glitch synthesizer sequence sound profile
     playAudioTone(90, 'sawtooth', 0.4);
     playAudioTone(120, 'square', 0.4);
-    
+
     // Step 3: Inject CSS glitch classes to flash the interface and shake Bumbot
     const flashElement = document.getElementById('damageFlash');
     flashElement.style.display = 'block';
     cat.classList.add('glitching');
-    
+
     // Step 4: Hold the frozen failure scene visible for 600 milliseconds before resetting
     setTimeout(() => {
         // Clear layout modifiers cleanly
         flashElement.style.display = 'none';
         cat.classList.remove('glitching');
-        
+
         // Re-teleport coordinates back to spawn safety point
-        catX = 50; 
-        catY = 0; 
-        velocityY = 0; 
+        catX = 50;
+        catY = 0;
+        velocityY = 0;
         isGrounded = true;
-        
+
         // Re-engage main updating runtime loops loop
         gameActive = true;
         requestAnimationFrame(update);
@@ -316,11 +332,11 @@ function createLandingDust(originX, originY) {
     for (let i = 0; i < 6; i++) {
         const dustElement = document.createElement('div');
         dustElement.classList.add('dust-particle');
-        
+
         dustElement.style.left = (originX + 20) + 'px'; // Center horizontally under Bumbot's 50px box
         dustElement.style.bottom = (40 + originY) + 'px';
         world.appendChild(dustElement);
-        
+
         activeDust.push({
             dom: dustElement,
             x: originX + 20,
@@ -338,13 +354,13 @@ function update() {
     // 1. Horizontal Inputs
     if (keys.ArrowRight) {
         faceDirection = 1;
-        cat.style.transform = 'scaleX(-1)'; 
+        cat.style.transform = 'scaleX(-1)';
         if (!checkSolidCollision(catX + moveSpeed, catY)) catX += moveSpeed;
         if (catX > worldWidth - 50) catX = worldWidth - 50;
     }
     if (keys.ArrowLeft) {
         faceDirection = -1;
-        cat.style.transform = 'scaleX(1)'; 
+        cat.style.transform = 'scaleX(1)';
         if (!checkSolidCollision(catX - moveSpeed, catY)) catX -= moveSpeed;
         if (catX < 0) catX = 0;
     }
@@ -360,7 +376,7 @@ function update() {
         velocityY -= gravity;
         let nextY = catY + velocityY;
         let hitObj = checkSolidCollision(catX, nextY);
-        
+
         if (hitObj) {
             if (velocityY < 0) {
                 nextY = (hitObj.type === 'platform') ? hitObj.height + 15 : hitObj.height;
@@ -370,14 +386,14 @@ function update() {
                 velocityY = 0; nextY = catY;
             }
         }
-        
+
         catY = nextY;
         if (catY <= 0) { catY = 0; velocityY = 0; isGrounded = true; }
     } else {
-        if (catY > 0 && !checkSolidCollision(catX, catY - 1)) { 
-            isGrounded = false; 
-            velocityY = 0; 
-            wasInAirBefore = true; 
+        if (catY > 0 && !checkSolidCollision(catX, catY - 1)) {
+            isGrounded = false;
+            velocityY = 0;
+            wasInAirBefore = true;
         }
     }
 
@@ -403,7 +419,7 @@ function update() {
         d.x += d.vx;
         d.y += d.vy;
         d.life -= 0.04; // Fast fade rate parameters
-        
+
         d.dom.style.left = d.x + 'px';
         d.dom.style.bottom = (40 + d.y) + 'px';
         d.dom.style.opacity = d.life;
@@ -418,7 +434,7 @@ function update() {
     // 4. Update Shatter Block Particles System
     for (let i = activeParticles.length - 1; i >= 0; i--) {
         let p = activeParticles[i];
-        p.vy -= 0.3; 
+        p.vy -= 0.3;
         p.x += p.vx; p.y += p.vy;
         p.life -= 0.02;
         p.dom.style.left = p.x + 'px';
@@ -439,14 +455,14 @@ function update() {
     world.style.left = (-cameraX) + 'px';
 
     // FIXED: Instead of sliding elements left, we shift their internal vector textures infinitely
-    farBuildings.style.backgroundPositionX = (-(cameraX * 0.15)) + 'px'; 
-    nearBuildings.style.backgroundPositionX = (-(cameraX * 0.40)) + 'px'; 
+    farBuildings.style.backgroundPositionX = (-(cameraX * 0.15)) + 'px';
+    nearBuildings.style.backgroundPositionX = (-(cameraX * 0.40)) + 'px';
 
     requestAnimationFrame(update);
 }
 
 function resetGame() {
-    catX = 50; catY = 0; velocityY = 0; isGrounded = true; 
+    catX = 50; catY = 0; velocityY = 0; isGrounded = true;
     score = 1; // FIXED: Restores your initial emergency blast charge on death/replay resets
     gameActive = true;
     energyDisplay.innerText = "Batteries: " + score;
