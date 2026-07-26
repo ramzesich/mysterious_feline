@@ -165,3 +165,39 @@ button:hover { background: #27ae60; }
     z-index: 30;
     user-select: none;
 }
+/* --- NEW: PARALLAX BACKGROUND STYLING --- */
+#skyBg {
+    position: absolute;
+    top: 0; left: 0; width: 100%; height: 100%;
+    background: radial-gradient(circle at top right, #2c1a4d, #0b071a);
+    z-index: 1;
+}
+#farBuildings {
+    position: absolute;
+    bottom: 40px; left: 0; width: 300%; height: 160px;
+    background: repeating-linear-gradient(90deg, #1c133a 0px, #1c133a 40px, transparent 40px, transparent 70px);
+    opacity: 0.4;
+    z-index: 2;
+}
+#nearBuildings {
+    position: absolute;
+    bottom: 40px; left: 0; width: 500%; height: 220px;
+    background: repeating-linear-gradient(90deg, #0e0a22 0px, #0e0a22 60px, transparent 60px, transparent 110px);
+    opacity: 0.75;
+    z-index: 3;
+}
+/* Shove the main map elements slightly above the backdrop */
+#world { z-index: 5; }
+
+/* --- NEW: ROBOTIC PIGEON STYLING --- */
+.pigeon {
+    position: absolute;
+    width: 30px;
+    height: 30px;
+    font-size: 26px;
+    line-height: 30px;
+    text-align: center;
+    user-select: none;
+    z-index: 12;
+    filter: drop-shadow(1px 0px 0px red) drop-shadow(-1px 0px 0px red) drop-shadow(0px 1px 0px red) drop-shadow(0px -1px 0px red);
+}
