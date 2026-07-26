@@ -239,8 +239,36 @@ function handleOverlapSystems() {
 }
 
 function triggerShortCircuitReset() {
-    playAudioTone(100, 'sawtooth', 0.25); 
-    catX = 50; catY = 0; velocityY = 0; isGrounded = true;
+    if (!gameActive) return;
+    
+    // Step 1: Lock player controls and physics instantly
+    gameActive = false;
+    
+    // Step 2: Trigger heavy static electrical glitch synthesizer sequence sound profile
+    playAudioTone(90, 'sawtooth', 0.4);
+    playAudioTone(120, 'square', 0.4);
+    
+    // Step 3: Inject CSS glitch classes to flash the interface and shake Bumbot
+    const flashElement = document.getElementById('damageFlash');
+    flashElement.style.display = 'block';
+    cat.classList.add('glitching');
+    
+    // Step 4: Hold the frozen failure scene visible for 600 milliseconds before resetting
+    setTimeout(() => {
+        // Clear layout modifiers cleanly
+        flashElement.style.display = 'none';
+        cat.classList.remove('glitching');
+        
+        // Re-teleport coordinates back to spawn safety point
+        catX = 50; 
+        catY = 0; 
+        velocityY = 0; 
+        isGrounded = true;
+        
+        // Re-engage main updating runtime loops loop
+        gameActive = true;
+        requestAnimationFrame(update);
+    }, 600);
 }
 
 function update() {
