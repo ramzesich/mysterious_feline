@@ -5,7 +5,7 @@ const meowBubble = document.getElementById('meowBubble');
 const energyDisplay = document.getElementById('energyDisplay');
 const winScreen = document.getElementById('winScreen');
 
-const worldWidth = 5000;
+const worldWidth = 8000;
 const windowWidth = 700;
 
 const keys = { ArrowLeft: false, ArrowRight: false, ArrowUp: false, Space: false };
