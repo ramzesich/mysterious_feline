@@ -142,7 +142,7 @@ function handleOverlapSystems() {
     const catWidth = 35;
     const catHeight = 45;
 
-    if (catX >= 4780) {
+if (catX >= 7780) {
         gameActive = false;
         winScreen.style.display = 'flex';
         playAudioTone(523.25, 'sine', 0.1);
