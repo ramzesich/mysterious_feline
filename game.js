@@ -4,6 +4,8 @@ const cat = document.getElementById('cat');
 const meowBubble = document.getElementById('meowBubble');
 const energyDisplay = document.getElementById('energyDisplay');
 const winScreen = document.getElementById('winScreen');
+const farBuildings = document.getElementById('farBuildings');
+const nearBuildings = document.getElementById('nearBuildings');
 
 const worldWidth = 8000;
 const windowWidth = 700;
@@ -55,10 +57,20 @@ window.addEventListener('keyup', (e) => {
 });
 
 let RuntimeEntities = [];
+let PigeonEntities = [];
+
+const pigeonSpawns = [
+    { x: 1200, left: 1000, right: 1400, y: 150 },
+    { x: 2300, left: 2100, right: 2500, y: 180 },
+    { x: 3200, left: 2900, right: 3500, y: 160 },
+    { x: 5000, left: 4700, right: 5300, y: 200 },
+    { x: 6800, left: 6500, right: 7100, y: 220 }
+];
 
 function generateLevel() {
-    document.querySelectorAll('.obstacle, .spike, .platform, .battery').forEach(el => el.remove());
+    document.querySelectorAll('.obstacle, .spike, .platform, .battery, .pigeon').forEach(el => el.remove());
     RuntimeEntities = [];
+    PigeonEntities = [];
 
     levelObjects.forEach((obj, index) => {
         const element = document.createElement('div');
@@ -86,24 +98,34 @@ function generateLevel() {
         world.appendChild(element);
         RuntimeEntities.push({ ...obj, dom: element, active: true });
     });
-}
 
+    pigeonSpawns.forEach((pig) => {
+        const element = document.createElement('div');
+        element.classList.add('pigeon');
+        element.innerText = '🐦';
+        element.style.left = pig.x + 'px';
+        element.style.bottom = pig.y + 'px';
+        world.appendChild(element);
+
+        PigeonEntities.push({
+            dom: element, x: pig.x, y: pig.y,
+            leftBound: pig.left, rightBound: pig.right,
+            speed: 2, dir: 1
+        });
+    });
+}
 function triggerSonicMeow() {
     playAudioTone(300, 'sawtooth', 0.15);
     playAudioTone(600, 'triangle', 0.2);
-    
     meowBubble.style.display = 'block';
     setTimeout(() => { meowBubble.style.display = 'none'; }, 600);
 
     RuntimeEntities.forEach(ent => {
         if (ent.type !== 'pillar' || !ent.active) return;
-        
         let distance = ent.x - catX;
         let withinRange = false;
-        
         if (faceDirection === 1 && distance > 0 && distance < 120) withinRange = true;
         if (faceDirection === -1 && distance < 0 && distance > -120) withinRange = true;
-
         if (withinRange) {
             ent.active = false;
             ent.dom.style.transform = "scale(0)";
@@ -117,20 +139,16 @@ function triggerSonicMeow() {
 function checkSolidCollision(targetX, targetY) {
     const catWidth = 35; 
     const catHeight = 45;
-
     for (let obj of RuntimeEntities) {
         if (!obj.active || obj.type === 'spike' || obj.type === 'battery') continue;
-
         let objMinX = obj.x;
         let objMaxX = obj.x + obj.width;
         let objMinY = 0;
         let objMaxY = obj.height;
-
         if (obj.type === 'platform') {
             objMinY = obj.height;
             objMaxY = obj.height + 15;
         }
-
         if (targetX < objMaxX && targetX + catWidth > objMinX && targetY < objMaxY && targetY + catHeight > objMinY) {
             return obj;
         }
@@ -142,7 +160,7 @@ function handleOverlapSystems() {
     const catWidth = 35;
     const catHeight = 45;
 
-if (catX >= 7780) {
+    if (catX >= 7780) {
         gameActive = false;
         winScreen.style.display = 'flex';
         playAudioTone(523.25, 'sine', 0.1);
@@ -151,16 +169,19 @@ if (catX >= 7780) {
         return;
     }
 
+    PigeonEntities.forEach(pig => {
+        if (catX < pig.x + 25 && catX + catWidth > pig.x && catY < pig.y - 15 && catY + catHeight > pig.y - 40) {
+            triggerShortCircuitReset();
+        }
+    });
+
     RuntimeEntities.forEach(obj => {
         if (!obj.active) return;
-
         if (obj.type === 'spike') {
             if (catX < obj.x + obj.width && catX + catWidth > obj.x && catY < obj.height && catY + catHeight > 0) {
-                playAudioTone(100, 'sawtooth', 0.25); 
-                catX = 50; catY = 0; velocityY = 0; isGrounded = true;
+                triggerShortCircuitReset();
             }
         }
-
         if (obj.type === 'battery') {
             if (catX < obj.x + 25 && catX + catWidth > obj.x && catY < obj.height + 25 && catY + catHeight > obj.height) {
                 obj.active = false;
@@ -171,6 +192,11 @@ if (catX >= 7780) {
             }
         }
     });
+}
+
+function triggerShortCircuitReset() {
+    playAudioTone(100, 'sawtooth', 0.25); 
+    catX = 50; catY = 0; velocityY = 0; isGrounded = true;
 }
 
 function update() {
@@ -213,6 +239,14 @@ function update() {
         if (catY > 0 && !checkSolidCollision(catX, catY - 1)) { isGrounded = false; velocityY = 0; }
     }
 
+    PigeonEntities.forEach(pig => {
+        pig.x += (pig.speed * pig.dir);
+        pig.dom.style.left = pig.x + 'px';
+        pig.dom.style.transform = pig.dir === 1 ? 'scaleX(-1)' : 'scaleX(1)';
+        if (pig.x >= pig.rightBound) pig.dir = -1;
+        if (pig.x <= pig.leftBound) pig.dir = 1;
+    });
+
     handleOverlapSystems();
 
     catContainer.style.left = catX + 'px';
@@ -223,16 +257,14 @@ function update() {
     if (cameraX > worldWidth - windowWidth) cameraX = worldWidth - windowWidth;
     world.style.left = (-cameraX) + 'px';
 
+    farBuildings.style.left = (-(cameraX * 0.15)) + 'px'; 
+    nearBuildings.style.left = (-(cameraX * 0.40)) + 'px'; 
+
     requestAnimationFrame(update);
 }
 
 function resetGame() {
-    catX = 50;
-    catY = 0;
-    velocityY = 0;
-    isGrounded = true;
-    score = 0;
-    gameActive = true;
+    catX = 50; catY = 0; velocityY = 0; isGrounded = true; score = 0; gameActive = true;
     energyDisplay.innerText = "Batteries: 0";
     winScreen.style.display = 'none';
     generateLevel();
