@@ -189,15 +189,24 @@ button:hover { background: #27ae60; }
 /* Shove the main map elements slightly above the backdrop */
 #world { z-index: 5; }
 
-/* --- NEW: ROBOTIC PIGEON STYLING --- */
 .pigeon {
     position: absolute;
-    width: 30px;
-    height: 30px;
-    font-size: 26px;
-    line-height: 30px;
+    width: 40px;
+    height: 40px;
+    font-size: 32px;
+    line-height: 40px;
     text-align: center;
     user-select: none;
     z-index: 12;
-    filter: drop-shadow(1px 0px 0px red) drop-shadow(-1px 0px 0px red) drop-shadow(0px 1px 0px red) drop-shadow(0px -1px 0px red);
+    filter: drop-shadow(1px 0px 0px #ff3333) drop-shadow(-1px 0px 0px #ff3333) drop-shadow(0px 1px 0px #ff3333) drop-shadow(0px -1px 0px #ff3333);
+}
+.cracked {
+    position: absolute;
+    width: 100%;
+    height: 100%;
+    top: 0; left: 0;
+    background-image: 
+        linear-gradient(45deg, transparent 45%, rgba(255,255,255,0.6) 48%, rgba(255,255,255,0.6) 52%, transparent 55%),
+        linear-gradient(-30deg, transparent 40%, rgba(255,255,255,0.6) 44%, rgba(255,255,255,0.6) 48%, transparent 52%);
+    pointer-events: none;
 }
