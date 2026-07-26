@@ -68,11 +68,13 @@ const pigeonSpawns = [
 ];
 
 function generateLevel() {
-    document.querySelectorAll('.obstacle, .spike, .platform, .battery, .pigeon').forEach(el => el.remove());
+    // Clear out everything, including our guidance arrow layers
+    document.querySelectorAll('.obstacle, .spike, .platform, .battery, .pigeon, .guidance-arrow').forEach(el => el.remove());
     RuntimeEntities = [];
     PigeonEntities = [];
 
-    // Ensure our dialogue node is initialized with the updated line string
+    // Sync our top dashboard display panel instantly on load
+    energyDisplay.innerText = "Batteries: " + score;
     meowBubble.innerText = "I am Bumbot!!!";
 
     levelObjects.forEach((obj, index) => {
@@ -96,16 +98,26 @@ function generateLevel() {
             element.innerText = '🔋';
             element.style.left = obj.x + 'px';
             element.style.bottom = (40 + obj.height) + 'px';
+        } else if (obj.type === 'arrow') {
+            // NEW: Render the neon guide signs
+            element.classList.add('guidance-arrow');
+            element.innerText = obj.arrowType === 'up' ? '⬆️' : '➡️';
+            element.style.left = obj.x + 'px';
+            element.style.bottom = (40 + obj.height) + 'px';
         }
         
         world.appendChild(element);
-        RuntimeEntities.push({ ...obj, dom: element, active: true });
+        
+        // Ignore arrows in active solid collision computation engines
+        if (obj.type !== 'arrow') {
+            RuntimeEntities.push({ ...obj, dom: element, active: true });
+        }
     });
 
     pigeonSpawns.forEach((pig) => {
         const element = document.createElement('div');
         element.classList.add('pigeon');
-        element.innerText = '🕊️'; // CHANGED: Native flying pigeon asset
+        element.innerText = '🕊️';
         element.style.left = pig.x + 'px';
         element.style.bottom = pig.y + 'px';
         world.appendChild(element);
@@ -117,6 +129,7 @@ function generateLevel() {
         });
     });
 }
+
 let activeParticles = [];
 
 function createShatterBurst(originX, originY, obstacleHeight) {
