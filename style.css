@@ -213,21 +213,34 @@ button:hover { background: #27ae60; }
 }
 #farBuildings {
     position: absolute;
-    bottom: 40px; left: 0; width: 400%; height: 180px;
+    bottom: 40px; left: 0; width: 100%; height: 180px; /* Changed width to 100% since repeat handles the rest */
     background: 
         linear-gradient(90deg, #161033 0px, #161033 70px, transparent 70px, transparent 150px, #1c133a 150px, #1c133a 260px, transparent 260px),
         linear-gradient(90deg, #130e2e 0px, #130e2e 110px, transparent 110px, transparent 200px, #150f35 200px, #150f35 340px, transparent 340px);
+    background-repeat: repeat-x; /* FIXED: City elements will now repeat forever */
+    background-size: 600px 180px; /* Dictates a healthy canvas tile scale window */
     opacity: 0.5;
     z-index: 2;
 }
 #nearBuildings {
     position: absolute;
-    bottom: 40px; left: 0; width: 600%; height: 240px;
+    bottom: 40px; left: 0; width: 100%; height: 240px;
     background: 
         linear-gradient(90deg, #0e0a22 0px, #0e0a22 90px, transparent 90px, transparent 210px, #0a071b 210px, #0a071b 330px, transparent 330px),
         linear-gradient(90deg, #0b081c 0px, #0b081c 140px, transparent 140px, transparent 280px, #110d29 280px, #110d29 400px, transparent 400px);
+    background-repeat: repeat-x; /* FIXED: City elements will now repeat forever */
+    background-size: 500px 240px;
     opacity: 0.85;
     z-index: 3;
+}
+.dust-particle {
+    position: absolute;
+    width: 6px;
+    height: 6px;
+    background: rgba(255, 255, 255, 0.4); /* Translucent off-white smoke */
+    border-radius: 50%; /* Smooth circular shape */
+    pointer-events: none;
+    z-index: 9;
 }
 #world { 
     position: absolute;
