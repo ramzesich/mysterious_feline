@@ -295,9 +295,34 @@ function triggerShortCircuitReset() {
     }, 600);
 }
 
+let activeDust = [];
+let wasInAirBefore = false; // Internal tracking state flag for gravity thresholds
+
+function createLandingDust(originX, originY) {
+    // Generate 6 small smoke cloud rings expanding sideways outwards from Bumbot's paws
+    for (let i = 0; i < 6; i++) {
+        const dustElement = document.createElement('div');
+        dustElement.classList.add('dust-particle');
+        
+        dustElement.style.left = (originX + 20) + 'px'; // Center horizontally under Bumbot's 50px box
+        dustElement.style.bottom = (40 + originY) + 'px';
+        world.appendChild(dustElement);
+        
+        activeDust.push({
+            dom: dustElement,
+            x: originX + 20,
+            y: originY,
+            vx: (Math.random() * 4 - 2), // Shoots outwards left and right
+            vy: (Math.random() * 1.5),   // Floats gently upward
+            life: 1.0
+        });
+    }
+}
+
 function update() {
     if (!gameActive) return;
 
+    // 1. Horizontal Inputs
     if (keys.ArrowRight) {
         faceDirection = 1;
         cat.style.transform = 'scaleX(-1)'; 
@@ -311,15 +336,18 @@ function update() {
         if (catX < 0) catX = 0;
     }
 
+    // 2. Vertical Jump Physics Engine
     if ((keys.ArrowUp || keys.Space) && isGrounded) {
         velocityY = jumpForce;
         isGrounded = false;
+        wasInAirBefore = true; // Flag that Bumbot took off
     }
 
     if (!isGrounded) {
         velocityY -= gravity;
         let nextY = catY + velocityY;
         let hitObj = checkSolidCollision(catX, nextY);
+        
         if (hitObj) {
             if (velocityY < 0) {
                 nextY = (hitObj.type === 'platform') ? hitObj.height + 15 : hitObj.height;
@@ -329,12 +357,25 @@ function update() {
                 velocityY = 0; nextY = catY;
             }
         }
+        
         catY = nextY;
         if (catY <= 0) { catY = 0; velocityY = 0; isGrounded = true; }
     } else {
-        if (catY > 0 && !checkSolidCollision(catX, catY - 1)) { isGrounded = false; velocityY = 0; }
+        if (catY > 0 && !checkSolidCollision(catX, catY - 1)) { 
+            isGrounded = false; 
+            velocityY = 0; 
+            wasInAirBefore = true; 
+        }
     }
 
+    // NEW LANDING DUST TRIGGER CHANGER: Detects the exact frame Bumbot hits solid surface ground/platform
+    if (isGrounded && wasInAirBefore) {
+        createLandingDust(catX, catY);
+        wasInAirBefore = false; // Reset takeoff state flag
+        playAudioTone(250, 'sine', 0.04); // Deep quiet thump landing frequency note bleep
+    }
+
+    // 3. Update Avian Drones
     PigeonEntities.forEach(pig => {
         pig.x += (pig.speed * pig.dir);
         pig.dom.style.left = pig.x + 'px';
@@ -343,23 +384,34 @@ function update() {
         if (pig.x <= pig.leftBound) pig.dir = 1;
     });
 
-    // NEW: Update active debris particle positions and apply gravity modifiers
+    // NEW: Update active landing smoke particles vector simulation
+    for (let i = activeDust.length - 1; i >= 0; i--) {
+        let d = activeDust[i];
+        d.x += d.vx;
+        d.y += d.vy;
+        d.life -= 0.04; // Fast fade rate parameters
+        
+        d.dom.style.left = d.x + 'px';
+        d.dom.style.bottom = (40 + d.y) + 'px';
+        d.dom.style.opacity = d.life;
+        d.dom.style.transform = "scale(" + (2 - d.life) + ")"; // Expands as it dissipates
+
+        if (d.life <= 0) {
+            d.dom.remove();
+            activeDust.splice(i, 1);
+        }
+    }
+
+    // 4. Update Shatter Block Particles System
     for (let i = activeParticles.length - 1; i >= 0; i--) {
         let p = activeParticles[i];
-        p.vy -= 0.3; // Particle gravity pull downward down
-        p.x += p.vx;
-        p.y += p.vy;
-        p.life -= 0.02; // Age particle decay ticks
-        
+        p.vy -= 0.3; 
+        p.x += p.vx; p.y += p.vy;
+        p.life -= 0.02;
         p.dom.style.left = p.x + 'px';
         p.dom.style.bottom = (40 + p.y) + 'px';
         p.dom.style.opacity = p.life;
-
-        // Clean up aged particle layers out of the DOM universe
-        if (p.life <= 0 || p.y < -40) {
-            p.dom.remove();
-            activeParticles.splice(i, 1);
-        }
+        if (p.life <= 0 || p.y < -40) { p.dom.remove(); activeParticles.splice(i, 1); }
     }
 
     handleOverlapSystems();
@@ -367,13 +419,15 @@ function update() {
     catContainer.style.left = catX + 'px';
     catContainer.style.bottom = (40 + catY) + 'px';
 
+    // 5. Camera & FIXED Infinite Parallax Layer Tracking
     let cameraX = catX - (windowWidth / 2) + 25;
     if (cameraX < 0) cameraX = 0;
     if (cameraX > worldWidth - windowWidth) cameraX = worldWidth - windowWidth;
     world.style.left = (-cameraX) + 'px';
 
-    farBuildings.style.left = (-(cameraX * 0.15)) + 'px'; 
-    nearBuildings.style.left = (-(cameraX * 0.40)) + 'px'; 
+    // FIXED: Instead of sliding elements left, we shift their internal vector textures infinitely
+    farBuildings.style.backgroundPositionX = (-(cameraX * 0.15)) + 'px'; 
+    nearBuildings.style.backgroundPositionX = (-(cameraX * 0.40)) + 'px'; 
 
     requestAnimationFrame(update);
 }
