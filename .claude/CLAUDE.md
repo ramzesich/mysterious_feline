@@ -1,64 +1,107 @@
 # Bumbot — browser platformer
 
-A single-level side-scrolling platformer. Play as Bumbot (a robot cat) across an 8000px
-cyberpunk city to the extraction portal, dodging spikes and pigeon drones, collecting
-batteries, and using the Sonic Meow to clear obstacles.
+A zone-based side-scrolling platformer. Play as Bumbot (a robot cat) across a cyberpunk city
+to the extraction portal, dodging spikes, pits and pigeon drones, collecting batteries, and
+using the Sonic Meow to clear obstacles. Zone 1 (`neon-outskirts`) is 16000px.
 
 ## Running it
 
 No build, no dependencies, no tests, no lint. Open `index.html` in a browser
 (`open index.html` — `file://` works fine). Scripts are plain globals loaded in order:
-`map.js` defines `levelObjects`, then `game.js` consumes it. There is no module system —
+`map.js` defines `ZONES`, then `game.js` consumes it. There is no module system —
 don't add `import`/`export` without also changing the script tags.
 
 Verify changes by actually playing: move right, jump onto a platform, hit a spike (death
-flash + respawn), press `M` (ripple + obstacles shatter), grab a battery, reach the portal.
+flash + respawn), fall into a pit, ride a mover, pass the feeder then die (should respawn at
+the feeder), press `M` (ripple + obstacles shatter), reach the portal.
 
 ## Files
 
 | File | Role |
 |---|---|
 | `index.html` | DOM skeleton: parallax layers, UI, `#world`, cat, win screen. Static elements only. |
-| `map.js` | `levelObjects` — the entire level as plain data, grouped in zone comments. |
+| `map.js` | `ZONES` — all level data, plus a header comment stating the design budget. |
 | `game.js` | Everything else: input, physics, collision, particles, camera, audio. |
 | `style.css` | All visuals, hitbox-relevant sizes, and keyframe animations. |
+
+## Zones
+
+`map.js` exports `ZONES`, an array of self-contained zone objects: `id`, `name`,
+`worldWidth`, `spawnX`, `pits`, `objects`, `pigeons`. `game.js` holds `zoneIndex` / `zone`
+and everything derives from that, so **adding a zone to the array is all that's needed** for
+it to be playable — the win screen automatically offers "Enter Next Zone" when a next zone
+exists, via `handleWinButton()`.
+
+End-of-zone geometry is derived, not hardcoded: `applyZoneGeometry()` sets `#world` width and
+positions `#portal` / `#extractionPad` from `worldWidth` minus `portalInset` / `padInset`,
+and the win line is `worldWidth - winInset`. Changing a zone's length is a one-number edit.
+
+`map.js`'s header comment records the design budget implied by the physics constants (max
+pit width, max platform/pillar height, the ~310px vertical ceiling). Read it before authoring
+level data — it's the difference between a fair level and an impossible one. Zone 1 is
+designed to be completable **without spending a single battery**; meows are optional help.
 
 ## Coordinate system (the main thing to get right)
 
 Game logic works in **pixels up from the top of the ground**, so `catY = 0` and
-`obj.height` are ground-relative. The ground is 40px tall (`#ground` in CSS), so *every*
-DOM write adds that offset:
+`obj.height` are ground-relative. The ground is 40px tall, so *every* DOM write adds that
+offset:
 
 ```js
 element.style.bottom = (40 + y) + 'px';
 ```
 
-That `40` is hardcoded in ~8 places (entity spawning, particles, dust, the cat container).
-Any new entity or effect must follow the same convention or it will float/sink by 40px.
-Horizontal `left` is absolute world-space; `#world` is shifted by the camera instead.
+That `40` is hardcoded in ~10 places (entity spawning, particles, dust, movers, the cat
+container). Any new entity or effect must follow the same convention or it will float/sink by
+40px. Horizontal `left` is absolute world-space; `#world` is shifted by the camera instead.
 
 ## Entity model
 
-`generateLevel()` turns each `levelObjects` entry into a DOM div plus a `RuntimeEntities`
-record (`{...obj, dom, active}`). Pigeons come from the separate `pigeonSpawns` array in
-`game.js` into `PigeonEntities`.
+`generateLevel()` turns each `zone.objects` entry into a DOM div plus a `RuntimeEntities`
+record (`{...obj, dom, active}`); `zone.pigeons` become `PigeonEntities`.
 
-- `pillar` — solid box from y=0 to `height`. Width comes from CSS (40px), not inline style.
+- `pillar` — solid box from y=0 to `height`.
 - `platform` — thin solid slab occupying y=`height`..`height+15`. Blocks from above *and*
-  below (rising into one zeroes velocity); it is not a jump-through platform.
-- `spike` — lethal, skipped by solid collision.
-- `battery` — collectible, skipped by solid collision, +1 ammo.
+  below (rising into one zeroes velocity); it is not a jump-through platform. With
+  `hidden: true` it renders invisible and is revealed permanently on first landing.
+- `mover` — a platform that oscillates. `axis: 'x'` slides between `baseX` and
+  `baseX + range`; `axis: 'y'` raises between `baseHeight` and `baseHeight + range`.
+- `spike` — lethal, overlap-only. Optional `y` mounts it on a slab (`y = height + 15`).
+- `battery` — collectible, overlap-only, +1 ammo.
+- `feeder` — the checkpoint, overlap-only. Passing it sets `respawnX` and adds `.active`.
 
-Removal pattern: set `active = false`, animate the DOM node, then `setTimeout(remove)`.
+`isSolidType()` / `isSlabType()` decide collision behavior — extend those rather than adding
+type checks inline. Removal pattern: set `active = false`, animate, then `setTimeout(remove)`.
 
-**Gotcha:** `generateLevel()` wipes the level with a hardcoded selector list
-(`game.js:72`). A new entity CSS class must be added there or stale nodes leak across
-resets.
+**Gotcha:** `generateLevel()` wipes the level with a hardcoded selector list. A new entity
+CSS class must be added there or stale nodes leak across resets.
 
 **Gotcha:** collision uses the *data* dimensions while rendering uses CSS ones, and they
 disagree — spikes are `width: 30` in data but 45px in CSS; the cat hitbox is 35×45 in
 `checkSolidCollision` while `#catContainer` is 50×42. This is load-bearing for game feel;
 don't "fix" the mismatch casually.
+
+## Ground, pits and falling
+
+The ground is **not** a single div. `buildGround()` emits a `.ground-segment` for each
+stretch between the zone's `pits`, plus a `.pit` void div per gap. `isOverSolidGround(x)`
+tests the cat's *centre* (x + 17) against the pit list, which keeps ledges forgiving instead
+of making a 1px overhang fatal.
+
+Consequences worth knowing: the ground clamp at `catY <= 0` is now conditional, falling past
+`fallDeathY` triggers the death reset, and the standing branch has to re-check support every
+frame. A pit is the one hazard a meow cannot remove — that's deliberate, and it's what keeps
+the no-battery route honest.
+
+## Movers and carrying
+
+`updateMovers()` runs **first** in `stepPhysics`, before player input, and applies its own
+delta to `catX`/`catY` when `groundedOn` is that mover. `groundedOn` is set on landing and
+refreshed each frame while grounded.
+
+Carrying deliberately skips collision resolution, so a horizontal mover can push Bumbot into
+a wall. Zone 1 keeps movers well clear of pillars for exactly this reason; if you place one
+near a wall, expect to add push-out handling.
 
 ## Game loop
 
@@ -74,17 +117,20 @@ The sub-stepping is not cosmetic: a single large step could carry Bumbot straigh
 Speed lives in the tunables block at the top of `game.js`. Jump apex is
 `jumpForce² / (2 * gravity)` ≈ 141px against a 135px tallest platform, so those two
 constants must be rebalanced together — bumping `gravity` alone makes platforms
-unreachable.
+unreachable, and it invalidates `map.js`'s design budget.
 
 `update()` early-returns when `gameActive === false`, which **terminates the loop
 entirely** — whoever cleared the flag must restart it with `requestAnimationFrame(update)`
 *and* reset `lastFrameTime = 0`, so the pause isn't billed as one enormous frame. Existing
-restart sites: `triggerShortCircuitReset()` (after 600ms) and `resetGame()`.
+restart sites: `triggerShortCircuitReset()` (after 600ms) and `loadZone()`.
 
 Two reset paths, deliberately different:
-- `triggerShortCircuitReset()` (death) — teleports to spawn, keeps score and level state.
-- `resetGame()` (win screen replay) — regenerates the level and resets score to 1. Called
-  from an inline `onclick` in `index.html`, so it must stay a global function.
+- `triggerShortCircuitReset()` (death) — returns to `respawnX` (the feeder if passed, else
+  the zone's spawn), keeping score and level state.
+- `loadZone(i)` — full reload: geometry, score back to 1, `respawnX` back to spawn, level
+  regenerated. `handleWinButton()` and `resetGame()` both route through it, and
+  `handleWinButton` is called from an inline `onclick` in `index.html`, so it must stay a
+  global function.
 
 ## Camera & parallax
 
@@ -102,18 +148,11 @@ band on a width that shares a factor with the others will reintroduce a short re
 The same camera clamp is duplicated inside `triggerSonicMeow()` to find the visible bounds.
 If you change camera math, change both.
 
-## Level geometry is hardcoded in five places
-
-Extending or shrinking the world means updating all of: `worldWidth` (game.js), `#world`
-width (style.css — **declared twice**, the second block at the bottom wins), `#portal`
-`left: 7800px`, `#extractionPad` `left: 7770px`, and the `catX >= 7780` win check in
-`handleOverlapSystems()`.
-
 ## Sonic Meow
 
 `M` key. Costs one battery (`score`, which doubles as ammo; starts at 1). Destroys every
-pillar, spike, and pigeon currently on screen, spawning rubble bursts. Zero batteries plays
-a low reject tone instead.
+pillar, spike, and pigeon currently on screen, spawning rubble bursts. Pits and movers are
+immune. Zero batteries plays a low reject tone instead.
 
 ## Audio
 

@@ -19,18 +19,18 @@
         <div id="energyDisplay">Batteries: 0</div>
     </div>
     <div id="world">
-        <div id="ground"></div>
+        <!-- Ground segments and pit voids are generated per zone by game.js -->
         <div id="extractionPad"></div>
         <div id="portal">🌀</div>
         <div id="catContainer">
-            <div id="meowBubble">I am Bumbot!</div>
+            <div id="meowBubble">I am Bumbot!!!</div>
             <div id="cat">🐈‍⬛</div>
         </div>
     </div>
     <div id="winScreen">
         <h1 style="color: #2ecc71;">MISSION ACCOMPLISHED</h1>
         <p id="finalScore">Bumbot safely made it to the station core!</p>
-        <button onclick="resetGame()">Replay Level</button>
+        <button id="winButton" onclick="handleWinButton()">Replay Zone</button>
     </div>
     <div class="instructions">[← / →] Move &nbsp;&nbsp;&nbsp;&nbsp; [Space / ↑] Jump &nbsp;&nbsp;&nbsp;&nbsp; [M] Sonic Meow (Uses Batteries)</div>
 </div>

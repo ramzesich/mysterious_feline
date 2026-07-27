@@ -34,18 +34,30 @@ body {
     position: absolute;
     top: 0;
     left: 0;
-    width: 8000px; /* Aligned with our new extended map size */
     height: 100%;
     z-index: 10;
+    /* width is set by game.js from the active zone's worldWidth */
 }
-#ground {
+/* One segment per stretch of solid ground between the zone's pits. Height 40 plus a 4px
+   lip, without box-sizing, exactly as the old single #ground div rendered. */
+.ground-segment {
     position: absolute;
     bottom: 0;
-    left: 0;
-    width: 100%;
     height: 40px;
     background: #222;
     border-top: 4px solid #444;
+}
+/* The void inside a gap. The amber lips are the readability cue: a pit has to be obvious
+   at a glance, since falling in is fatal and no meow can clear it. */
+.pit {
+    position: absolute;
+    bottom: 0;
+    height: 44px;
+    background: linear-gradient(#0a0714, #05030c);
+    border-left: 3px solid rgba(255, 159, 28, 0.85);
+    border-right: 3px solid rgba(255, 159, 28, 0.85);
+    box-sizing: border-box;
+    box-shadow: inset 0 8px 14px rgba(0, 0, 0, 0.9);
 }
 #catContainer {
     position: absolute;
@@ -154,6 +166,24 @@ body {
     border-radius: 4px;
     height: 15px;
 }
+/* Invisible until landed on, then permanently revealed. The battery floating above one of
+   these is the only hint that it exists. */
+.platform.hidden-platform {
+    opacity: 0;
+    transition: opacity 0.3s ease-out;
+}
+.platform.hidden-platform.revealed {
+    opacity: 1;
+}
+/* Amber instead of the static platforms' blue, so "this one moves" reads instantly */
+.mover {
+    position: absolute;
+    height: 15px;
+    background: #8e5a1f;
+    border: 2px solid #d98c26;
+    border-radius: 4px;
+    box-shadow: 0 0 10px rgba(217, 140, 38, 0.45);
+}
 .battery {
     position: absolute;
     width: 25px;
@@ -163,16 +193,83 @@ body {
     text-align: center;
     user-select: none;
 }
+/* The checkpoint: an automatic cat feeder. ::before is the hopper, ::after the bowl, and
+   the two child divs are the status LED and the kibble that appears on activation. */
+.feeder {
+    position: absolute;
+    bottom: 40px;
+    width: 44px;
+    height: 72px;
+    z-index: 5;
+}
+.feeder::before {
+    content: '';
+    position: absolute;
+    top: 0;
+    left: 7px;
+    width: 30px;
+    height: 46px;
+    background: linear-gradient(#2b3149, #171a29);
+    border: 2px solid #3d4a6b;
+    border-radius: 7px 7px 3px 3px;
+    box-sizing: border-box;
+}
+.feeder::after {
+    content: '';
+    position: absolute;
+    bottom: 0;
+    left: 2px;
+    width: 40px;
+    height: 18px;
+    background: #22273a;
+    border: 2px solid #3d4a6b;
+    border-radius: 0 0 20px 20px;
+    box-sizing: border-box;
+}
+.feeder-led {
+    position: absolute;
+    top: 8px;
+    left: 19px;
+    width: 6px;
+    height: 6px;
+    border-radius: 50%;
+    background: #5a2530; /* Dim red until Bumbot walks past */
+    z-index: 2;
+}
+.feeder-kibble {
+    position: absolute;
+    bottom: 5px;
+    left: 9px;
+    width: 26px;
+    height: 8px;
+    background:
+        radial-gradient(circle at 20% 55%, #e8a13d 0 3px, transparent 3px),
+        radial-gradient(circle at 52% 35%, #d98c26 0 3px, transparent 3px),
+        radial-gradient(circle at 82% 60%, #c07a1c 0 3px, transparent 3px);
+    opacity: 0;
+    transition: opacity 0.3s ease-out;
+    z-index: 2;
+}
+.feeder.active::before {
+    border-color: #1d6f7d;
+}
+.feeder.active .feeder-led {
+    background: #00f0ff;
+    box-shadow: 0 0 10px #00f0ff, 0 0 18px rgba(0, 240, 255, 0.6);
+}
+.feeder.active .feeder-kibble {
+    opacity: 1;
+}
 #portal {
     position: absolute;
     bottom: 40px;
-    left: 7800px; /* Placed at the end of the new 8000px layout */
     width: 60px;
     height: 90px;
     font-size: 60px;
     line-height: 90px;
     text-align: center;
     user-select: none;
+    /* left is set by game.js, measured back from the active zone's right edge */
 }
 #winScreen {
     display: none;
@@ -261,7 +358,6 @@ button:hover { background: #27ae60; }
 #extractionPad {
     position: absolute;
     bottom: 40px;
-    left: 7770px; /* Aligned right beneath the 7800px portal core center */
     width: 120px;
     height: 12px;
     background: #2b2b2b;
@@ -269,6 +365,7 @@ button:hover { background: #27ae60; }
     box-shadow: 0px -4px 15px rgba(0, 240, 255, 0.7);
     border-radius: 2px;
     z-index: 6;
+    /* left is set by game.js, 30px left of the portal */
 }
 .rubble-particle {
     position: absolute;
