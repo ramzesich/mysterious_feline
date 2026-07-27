@@ -212,25 +212,40 @@ button:hover { background: #27ae60; }
     background: radial-gradient(circle at top right, #2c1a4d, #0b071a);
     z-index: 1;
 }
+/* Each skyline is several silhouette bands stacked on deliberately coprime tile widths.
+   One tile alone repeats every screen or two and reads as wallpaper; overlapping 900/700/1100
+   means the combined pattern only comes back around after tens of thousands of pixels.
+   background-position anchors every band to the bottom, so differing tile heights give the
+   skyline its varied roofline. game.js overrides background-position-x only, keeping the Y. */
 #farBuildings {
     position: absolute;
-    bottom: 40px; left: 0; width: 100%; height: 180px; /* Changed width to 100% since repeat handles the rest */
+    bottom: 40px; left: 0; width: 100%; height: 200px;
     background:
-        linear-gradient(90deg, #161033 0px, #161033 70px, transparent 70px, transparent 150px, #1c133a 150px, #1c133a 260px, transparent 260px),
-        linear-gradient(90deg, #130e2e 0px, #130e2e 110px, transparent 110px, transparent 200px, #150f35 200px, #150f35 340px, transparent 340px);
-    background-repeat: repeat-x; /* FIXED: City elements will now repeat forever */
-    background-size: 600px 180px; /* Dictates a healthy canvas tile scale window */
+        /* Slender radio masts on the widest tile, so they punctuate rather than pattern */
+        linear-gradient(90deg, transparent 0 96px, #1f1549 96px 106px, transparent 106px 470px, #1b1240 470px 478px, transparent 478px 900px),
+        /* Mid-rise towers */
+        linear-gradient(90deg, #161033 0 70px, transparent 70px 150px, #1c133a 150px 260px, transparent 260px 430px, #191141 430px 494px, transparent 494px 700px),
+        /* Squat blocks filling the gaps behind them */
+        linear-gradient(90deg, transparent 0 30px, #130e2e 30px 140px, transparent 140px 250px, #150f35 250px 390px, transparent 390px 520px, #171038 520px 612px, transparent 612px 1100px);
+    background-repeat: repeat-x;
+    background-size: 900px 190px, 700px 138px, 1100px 92px;
+    background-position: 0 100%;
     opacity: 0.5;
     z-index: 2;
 }
 #nearBuildings {
     position: absolute;
-    bottom: 40px; left: 0; width: 100%; height: 240px;
+    bottom: 40px; left: 0; width: 100%; height: 260px;
     background:
-        linear-gradient(90deg, #0e0a22 0px, #0e0a22 90px, transparent 90px, transparent 210px, #0a071b 210px, #0a071b 330px, transparent 330px),
-        linear-gradient(90deg, #0b081c 0px, #0b081c 140px, transparent 140px, transparent 280px, #110d29 280px, #110d29 400px, transparent 400px);
-    background-repeat: repeat-x; /* FIXED: City elements will now repeat forever */
-    background-size: 500px 240px;
+        /* Foreground towers, tallest and most opaque */
+        linear-gradient(90deg, #0e0a22 0 90px, transparent 90px 210px, #0a071b 210px 330px, transparent 330px 486px, #100c26 486px 552px, transparent 552px 820px),
+        /* A second row on a much wider tile to break up the rhythm of the first */
+        linear-gradient(90deg, transparent 0 62px, #0b081c 62px 200px, transparent 200px 344px, #110d29 344px 470px, transparent 470px 640px, #0d0a20 640px 762px, transparent 762px 1300px),
+        /* Low rooftops and utility sheds hugging the ground line */
+        linear-gradient(90deg, transparent 0 24px, #0c0920 24px 128px, transparent 128px 300px, #0f0b25 300px 372px, transparent 372px 540px);
+    background-repeat: repeat-x;
+    background-size: 820px 232px, 1300px 154px, 540px 74px;
+    background-position: 0 100%;
     opacity: 0.85;
     z-index: 3;
 }
@@ -286,24 +301,6 @@ button:hover { background: #27ae60; }
         linear-gradient(-30deg, transparent 40%, rgba(255,255,255,0.6) 44%, rgba(255,255,255,0.6) 48%, transparent 52%);
     pointer-events: none;
 }
-.guidance-arrow {
-    position: absolute;
-    width: 30px;
-    height: 30px;
-    font-size: 26px;
-    line-height: 30px;
-    text-align: center;
-    user-select: none;
-    z-index: 4; /* Renders behind platforms but cleanly in front of skyscrapers */
-    filter: drop-shadow(0px 0px 8px #00f0ff); /* Glowing cyber cyan shader */
-    animation: neonPulse 1.5s ease-in-out infinite alternate;
-}
-
-@keyframes neonPulse {
-    0% { opacity: 0.4; transform: scale(0.9); }
-    100% { opacity: 0.95; transform: scale(1.1); }
-}
-
 .sonic-ripple {
     position: absolute;
     border: 4px solid #00f0ff;

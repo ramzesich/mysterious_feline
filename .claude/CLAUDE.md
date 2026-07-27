@@ -48,8 +48,6 @@ record (`{...obj, dom, active}`). Pigeons come from the separate `pigeonSpawns` 
   below (rising into one zeroes velocity); it is not a jump-through platform.
 - `spike` — lethal, skipped by solid collision.
 - `battery` — collectible, skipped by solid collision, +1 ammo.
-- `arrow` — purely decorative signage; deliberately **excluded** from `RuntimeEntities`
-  so it never collides.
 
 Removal pattern: set `active = false`, animate the DOM node, then `setTimeout(remove)`.
 
@@ -64,11 +62,24 @@ don't "fix" the mismatch casually.
 
 ## Game loop
 
-One `update()` driven by `requestAnimationFrame`. It early-returns when
-`gameActive === false`, which **terminates the loop entirely** — whoever cleared the flag
-must restart it with `requestAnimationFrame(update)`. Existing restart sites:
-`triggerShortCircuitReset()` (after 600ms) and `resetGame()`. Freezing the game without a
-restart path is the easiest way to hard-lock it.
+One `update(timestamp)` driven by `requestAnimationFrame`, which measures `dt` in units of
+"60fps frames" and advances `stepPhysics(slice)` in slices of at most 1. Every tuning
+constant is therefore still authored as a per-60fps-frame value and keeps that meaning at
+any refresh rate — when adding movement or particle motion, scale it by `dt` (or by the
+`dt` handed to `stepPhysics`) or it will silently become frame-rate dependent again.
+
+The sub-stepping is not cosmetic: a single large step could carry Bumbot straight through a
+15px platform slab without ever overlapping it. `dt` is clamped to `maxCatchUpFrames`.
+
+Speed lives in the tunables block at the top of `game.js`. Jump apex is
+`jumpForce² / (2 * gravity)` ≈ 141px against a 135px tallest platform, so those two
+constants must be rebalanced together — bumping `gravity` alone makes platforms
+unreachable.
+
+`update()` early-returns when `gameActive === false`, which **terminates the loop
+entirely** — whoever cleared the flag must restart it with `requestAnimationFrame(update)`
+*and* reset `lastFrameTime = 0`, so the pause isn't billed as one enormous frame. Existing
+restart sites: `triggerShortCircuitReset()` (after 600ms) and `resetGame()`.
 
 Two reset paths, deliberately different:
 - `triggerShortCircuitReset()` (death) — teleports to spawn, keeps score and level state.
@@ -81,6 +92,12 @@ Two reset paths, deliberately different:
 Background layers scroll via `backgroundPositionX` on `#farBuildings` (0.15×) and
 `#nearBuildings` (0.40×) — they are `repeat-x` tiles, so they scroll infinitely. Don't
 translate those elements; that was the earlier broken approach.
+
+Each skyline layer is several gradient bands on **coprime tile widths** (900/700/1100 and
+820/1300/540) anchored with `background-position: 0 100%`, which is what keeps the city from
+reading as visibly repeating wallpaper. Two consequences: the CSS sets the shorthand so that
+JS can override `background-position-x` alone and keep the bottom anchoring, and adding a
+band on a width that shares a factor with the others will reintroduce a short repeat.
 
 The same camera clamp is duplicated inside `triggerSonicMeow()` to find the visible bounds.
 If you change camera math, change both.

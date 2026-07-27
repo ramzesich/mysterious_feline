@@ -20,9 +20,19 @@ let score = 1; // Acts as our battery fuel ammo clip counter
 let gameActive = true;
 let faceDirection = 1;
 
-const moveSpeed = 5;
-const gravity = 0.6;
-const jumpForce = 13;
+// --- Tunables. Values are "per 60fps frame" and get scaled by dt, so they mean
+// --- the same thing at any refresh rate. Raise moveSpeed to cross the map faster.
+const moveSpeed = 7;
+const gravity = 0.8;
+const jumpForce = 15;
+
+// Jump apex is jumpForce^2 / (2 * gravity) ~= 141px. The tallest platform sits at
+// 120 + 15 for the slab = 135px, so there is only ~6px of headroom: raising gravity
+// or lowering jumpForce without rebalancing the other will make platforms unreachable.
+
+const frameMs = 1000 / 60;  // Reference frame duration that the constants above assume
+const maxCatchUpFrames = 4; // Ceiling on dt so a stall can't teleport Bumbot across the map
+let lastFrameTime = 0;
 
 let audioCtx = null;
 function playAudioTone(freq, type, duration) {
@@ -68,8 +78,7 @@ const pigeonSpawns = [
 ];
 
 function generateLevel() {
-    // Clear out everything, including our guidance arrow layers
-    document.querySelectorAll('.obstacle, .spike, .platform, .battery, .pigeon, .guidance-arrow').forEach(el => el.remove());
+    document.querySelectorAll('.obstacle, .spike, .platform, .battery, .pigeon').forEach(el => el.remove());
     RuntimeEntities = [];
     PigeonEntities = [];
 
@@ -98,20 +107,10 @@ function generateLevel() {
             element.innerText = '🔋';
             element.style.left = obj.x + 'px';
             element.style.bottom = (40 + obj.height) + 'px';
-        } else if (obj.type === 'arrow') {
-            // NEW: Render the neon guide signs
-            element.classList.add('guidance-arrow');
-            element.innerText = obj.arrowType === 'up' ? '⬆️' : '➡️';
-            element.style.left = obj.x + 'px';
-            element.style.bottom = (40 + obj.height) + 'px';
         }
 
         world.appendChild(element);
-
-        // Ignore arrows in active solid collision computation engines
-        if (obj.type !== 'arrow') {
-            RuntimeEntities.push({ ...obj, dom: element, active: true });
-        }
+        RuntimeEntities.push({ ...obj, dom: element, active: true });
     });
 
     pigeonSpawns.forEach((pig) => {
@@ -319,6 +318,7 @@ function triggerShortCircuitReset() {
 
         // Re-engage main updating runtime loops loop
         gameActive = true;
+        lastFrameTime = 0; // Discard the 600ms pause so it is not treated as one huge frame
         requestAnimationFrame(update);
     }, 600);
 }
@@ -347,33 +347,33 @@ function createLandingDust(originX, originY) {
     }
 }
 
-function update() {
-    if (!gameActive) return;
-
+function stepPhysics(dt) {
     // 1. Horizontal Inputs
     if (keys.ArrowRight) {
         faceDirection = 1;
         cat.style.setProperty('--face', -1);
-        if (!checkSolidCollision(catX + moveSpeed, catY)) catX += moveSpeed;
+        const step = moveSpeed * dt;
+        if (!checkSolidCollision(catX + step, catY)) catX += step;
         if (catX > worldWidth - 50) catX = worldWidth - 50;
     }
     if (keys.ArrowLeft) {
         faceDirection = -1;
         cat.style.setProperty('--face', 1);
-        if (!checkSolidCollision(catX - moveSpeed, catY)) catX -= moveSpeed;
+        const step = moveSpeed * dt;
+        if (!checkSolidCollision(catX - step, catY)) catX -= step;
         if (catX < 0) catX = 0;
     }
 
     // 2. Vertical Jump Physics Engine
     if ((keys.ArrowUp || keys.Space) && isGrounded) {
-        velocityY = jumpForce;
+        velocityY = jumpForce; // An instant impulse, so this one is not dt-scaled
         isGrounded = false;
         wasInAirBefore = true; // Flag that Bumbot took off
     }
 
     if (!isGrounded) {
-        velocityY -= gravity;
-        let nextY = catY + velocityY;
+        velocityY -= gravity * dt;
+        let nextY = catY + velocityY * dt;
         let hitObj = checkSolidCollision(catX, nextY);
 
         if (hitObj) {
@@ -396,7 +396,7 @@ function update() {
         }
     }
 
-    // NEW LANDING DUST TRIGGER CHANGER: Detects the exact frame Bumbot hits solid surface ground/platform
+    // Detects the exact frame Bumbot hits solid surface ground/platform
     if (isGrounded && wasInAirBefore) {
         createLandingDust(catX, catY);
         wasInAirBefore = false; // Reset takeoff state flag
@@ -405,19 +405,46 @@ function update() {
 
     // 3. Update Avian Drones
     PigeonEntities.forEach(pig => {
-        pig.x += (pig.speed * pig.dir);
+        pig.x += (pig.speed * pig.dir * dt);
         pig.dom.style.left = pig.x + 'px';
         pig.dom.style.transform = pig.dir === 1 ? 'scaleX(-1)' : 'scaleX(1)';
         if (pig.x >= pig.rightBound) pig.dir = -1;
         if (pig.x <= pig.leftBound) pig.dir = 1;
     });
 
-    // NEW: Update active landing smoke particles vector simulation
+    handleOverlapSystems();
+}
+
+function update(timestamp) {
+    if (!gameActive) return;
+
+    // Measure how long the last frame actually took, expressed in 60fps frames, so a
+    // display running at 30fps or a browser dropping frames plays at the same speed
+    // instead of going into slow motion.
+    let dt = 1;
+    if (lastFrameTime && timestamp) {
+        dt = Math.min((timestamp - lastFrameTime) / frameMs, maxCatchUpFrames);
+    }
+    lastFrameTime = timestamp || 0;
+
+    // Advance physics in slices of at most one frame. A single big step could carry
+    // Bumbot straight through a 15px platform slab without ever overlapping it.
+    let remaining = dt;
+    while (remaining > 0 && gameActive) {
+        const slice = Math.min(remaining, 1);
+        stepPhysics(slice);
+        remaining -= slice;
+    }
+
+    // Death and win both clear gameActive and own restarting the loop themselves
+    if (!gameActive) return;
+
+    // Update active landing smoke particles vector simulation
     for (let i = activeDust.length - 1; i >= 0; i--) {
         let d = activeDust[i];
-        d.x += d.vx;
-        d.y += d.vy;
-        d.life -= 0.04; // Fast fade rate parameters
+        d.x += d.vx * dt;
+        d.y += d.vy * dt;
+        d.life -= 0.04 * dt; // Fast fade rate parameters
 
         d.dom.style.left = d.x + 'px';
         d.dom.style.bottom = (40 + d.y) + 'px';
@@ -433,27 +460,25 @@ function update() {
     // 4. Update Shatter Block Particles System
     for (let i = activeParticles.length - 1; i >= 0; i--) {
         let p = activeParticles[i];
-        p.vy -= 0.3;
-        p.x += p.vx; p.y += p.vy;
-        p.life -= 0.02;
+        p.vy -= 0.3 * dt;
+        p.x += p.vx * dt; p.y += p.vy * dt;
+        p.life -= 0.02 * dt;
         p.dom.style.left = p.x + 'px';
         p.dom.style.bottom = (40 + p.y) + 'px';
         p.dom.style.opacity = p.life;
         if (p.life <= 0 || p.y < -40) { p.dom.remove(); activeParticles.splice(i, 1); }
     }
 
-    handleOverlapSystems();
-
     catContainer.style.left = catX + 'px';
     catContainer.style.bottom = (40 + catY) + 'px';
 
-    // 5. Camera & FIXED Infinite Parallax Layer Tracking
+    // 5. Camera & Infinite Parallax Layer Tracking
     let cameraX = catX - (windowWidth / 2) + 25;
     if (cameraX < 0) cameraX = 0;
     if (cameraX > worldWidth - windowWidth) cameraX = worldWidth - windowWidth;
     world.style.left = (-cameraX) + 'px';
 
-    // FIXED: Instead of sliding elements left, we shift their internal vector textures infinitely
+    // Instead of sliding elements left, we shift their internal vector textures infinitely
     farBuildings.style.backgroundPositionX = (-(cameraX * 0.15)) + 'px';
     nearBuildings.style.backgroundPositionX = (-(cameraX * 0.40)) + 'px';
 
@@ -462,8 +487,9 @@ function update() {
 
 function resetGame() {
     catX = 50; catY = 0; velocityY = 0; isGrounded = true;
-    score = 1; // FIXED: Restores your initial emergency blast charge on death/replay resets
+    score = 1; // Restores your initial emergency blast charge on death/replay resets
     gameActive = true;
+    lastFrameTime = 0; // However long the win screen was up, it is not a game frame
     energyDisplay.innerText = "Batteries: " + score;
     winScreen.style.display = 'none';
     generateLevel();
