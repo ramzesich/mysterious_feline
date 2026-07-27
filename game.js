@@ -353,13 +353,13 @@ function update() {
     // 1. Horizontal Inputs
     if (keys.ArrowRight) {
         faceDirection = 1;
-        cat.style.transform = 'scaleX(-1)';
+        cat.style.setProperty('--face', -1);
         if (!checkSolidCollision(catX + moveSpeed, catY)) catX += moveSpeed;
         if (catX > worldWidth - 50) catX = worldWidth - 50;
     }
     if (keys.ArrowLeft) {
         faceDirection = -1;
-        cat.style.transform = 'scaleX(1)';
+        cat.style.setProperty('--face', 1);
         if (!checkSolidCollision(catX - moveSpeed, catY)) catX -= moveSpeed;
         if (catX < 0) catX = 0;
     }

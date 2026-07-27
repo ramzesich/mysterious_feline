@@ -36,6 +36,7 @@ body {
     left: 0;
     width: 8000px; /* Aligned with our new extended map size */
     height: 100%;
+    z-index: 10;
 }
 #ground {
     position: absolute;
@@ -61,7 +62,7 @@ body {
     line-height: 42px; /* Tight line height overrides text box centering and lowers the emoji */
     text-align: center;
     user-select: none;
-    transform: scaleX(-1);
+    transform: scaleX(var(--face, -1)); /* --face is set from JS: -1 faces right, 1 faces left */
     display: block; /* Forces clean geometric drawing bounds rather than character spacing */
     filter: brightness(0) drop-shadow(1px 0px 0px white) drop-shadow(-1px 0px 0px white) drop-shadow(0px 1px 0px white) drop-shadow(0px -1px 0px white);
 }
@@ -118,17 +119,17 @@ body {
 }
 
 @keyframes bumbotShake {
-    0% { transform: translate(1px, 1px) scaleX(-1); }
-    10% { transform: translate(-1px, -2px) scaleX(-1); }
-    20% { transform: translate(-3px, 0px) scaleX(-1); }
-    30% { transform: translate(0px, 2px) scaleX(-1); }
-    40% { transform: translate(1px, -1px) scaleX(-1); }
-    50% { transform: translate(-1px, 2px) scaleX(-1); }
-    60% { transform: translate(-3px, 1px) scaleX(-1); }
-    70% { transform: translate(2px, 1px) scaleX(-1); }
-    80% { transform: translate(-1px, -1px) scaleX(-1); }
-    90% { transform: translate(2px, 2px) scaleX(-1); }
-    100% { transform: translate(1px, -2px) scaleX(-1); }
+    0% { transform: translate(1px, 1px) scaleX(var(--face, -1)); }
+    10% { transform: translate(-1px, -2px) scaleX(var(--face, -1)); }
+    20% { transform: translate(-3px, 0px) scaleX(var(--face, -1)); }
+    30% { transform: translate(0px, 2px) scaleX(var(--face, -1)); }
+    40% { transform: translate(1px, -1px) scaleX(var(--face, -1)); }
+    50% { transform: translate(-1px, 2px) scaleX(var(--face, -1)); }
+    60% { transform: translate(-3px, 1px) scaleX(var(--face, -1)); }
+    70% { transform: translate(2px, 1px) scaleX(var(--face, -1)); }
+    80% { transform: translate(-1px, -1px) scaleX(var(--face, -1)); }
+    90% { transform: translate(2px, 2px) scaleX(var(--face, -1)); }
+    100% { transform: translate(1px, -2px) scaleX(var(--face, -1)); }
 }
 .glitching {
     animation: bumbotShake 0.15s infinite;
@@ -241,11 +242,6 @@ button:hover { background: #27ae60; }
     border-radius: 50%; /* Smooth circular shape */
     pointer-events: none;
     z-index: 9;
-}
-#world {
-    position: absolute;
-    top: 0; left: 0; width: 8000px; height: 100%;
-    z-index: 10;
 }
 #extractionPad {
     position: absolute;
