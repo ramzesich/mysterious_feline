@@ -157,7 +157,7 @@ function spawnAfterImage() {
     ghost.innerText = '🐈‍⬛';
     ghost.style.left = catX + 'px';
     ghost.style.bottom = (40 + catY) + 'px';
-    ghost.style.transform = 'scaleX(' + (-faceDirection) + ')';
+    ghost.style.transform = 'translateY(var(--paw-drop)) scaleX(' + (-faceDirection) + ')';
     world.appendChild(ghost);
     setTimeout(() => ghost.remove(), 360);
 }

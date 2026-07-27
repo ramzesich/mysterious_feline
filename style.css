@@ -1,3 +1,10 @@
+/* The cat emoji's ink stops short of the bottom of its line box (descender space the glyph
+   never draws into), so the sprite floated a few px above whatever he was standing on.
+   Everything that draws him — #cat and the catnip after-images — shifts down by this much so
+   his paws sit on the surface his 40+catY container bottom is actually resting on. */
+:root {
+    --paw-drop: 5px;
+}
 body {
     margin: 0;
     background: #111;
@@ -47,13 +54,14 @@ body {
     height: 40px;
     background: #222;
     border-top: 4px solid #444;
+    box-sizing: border-box; /* Same reason as the concrete: the border must not push the walkable top above 40px */
 }
 /* The void inside a gap. The amber lips are the readability cue: a pit has to be obvious
    at a glance, since falling in is fatal and no meow can clear it. */
 .pit {
     position: absolute;
     bottom: 0;
-    height: 44px;
+    height: 40px; /* Flush with the ground segments either side, so the amber lips line up */
     background: linear-gradient(#0a0714, #05030c);
     border-left: 3px solid rgba(255, 159, 28, 0.85);
     border-right: 3px solid rgba(255, 159, 28, 0.85);
@@ -76,7 +84,7 @@ body {
     line-height: 42px; /* Tight line height overrides text box centering and lowers the emoji */
     text-align: center;
     user-select: none;
-    transform: scaleX(var(--face, -1)); /* --face is set on #catContainer and inherits down */
+    transform: translateY(var(--paw-drop)) scaleX(var(--face, -1)); /* --face is set on #catContainer and inherits down */
     display: block; /* Forces clean geometric drawing bounds rather than character spacing */
     /* A black Bombay cat lit by the city rather than a white-outlined sprite: warm street
        light catches one edge, cool bounce light the other, and the soft dark spread keeps
@@ -210,12 +218,12 @@ body {
 /* Head-dip chewing loop for the victory sequence. Like bumbotFlinch, every keyframe has to
    re-state scaleX(var(--face)) or the animation would clobber which way Bumbot faces. */
 @keyframes bumbotMunch {
-    0% { transform: translateY(0px) rotate(0deg) scaleX(var(--face, -1)); }
-    20% { transform: translateY(4px) rotate(-6deg) scaleX(var(--face, -1)); }
-    40% { transform: translateY(1px) rotate(-2deg) scaleX(var(--face, -1)); }
-    60% { transform: translateY(4px) rotate(-5deg) scaleX(var(--face, -1)); }
-    80% { transform: translateY(1px) rotate(-1deg) scaleX(var(--face, -1)); }
-    100% { transform: translateY(0px) rotate(0deg) scaleX(var(--face, -1)); }
+    0% { transform: translateY(var(--paw-drop)) rotate(0deg) scaleX(var(--face, -1)); }
+    20% { transform: translateY(calc(var(--paw-drop) + 4px)) rotate(-6deg) scaleX(var(--face, -1)); }
+    40% { transform: translateY(calc(var(--paw-drop) + 1px)) rotate(-2deg) scaleX(var(--face, -1)); }
+    60% { transform: translateY(calc(var(--paw-drop) + 4px)) rotate(-5deg) scaleX(var(--face, -1)); }
+    80% { transform: translateY(calc(var(--paw-drop) + 1px)) rotate(-1deg) scaleX(var(--face, -1)); }
+    100% { transform: translateY(var(--paw-drop)) rotate(0deg) scaleX(var(--face, -1)); }
 }
 .munching {
     animation: bumbotMunch 0.45s ease-in-out infinite;
