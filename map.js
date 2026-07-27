@@ -8,7 +8,7 @@
 //   * Max horizontal jump ~260px. Pits are kept <= 200px so every gap has landing margin.
 //   * Pillars stay <= 125. Above ~130 there is not enough time above the top to clear a
 //     40px-wide pillar, which would silently make a Sonic Meow mandatory.
-//   * The whole zone is completable without spending a single battery. Meows are a
+//   * The whole zone is completable without spending a single snack. Meows are a
 //     convenience, never a requirement.
 //   * Only ~310px of air exists above the ground and the camera never pans vertically,
 //     so nothing playable should sit above y ~265.
@@ -21,7 +21,7 @@ const ZONES = [
         spawnX: 50,
 
         // Gaps in the ground. Falling into one is lethal, and no meow can remove them,
-        // which is what keeps the battery economy optional.
+        // which is what keeps the snack economy optional.
         pits: [
             { x: 2900, width: 110 },  // First pit: deliberately narrow enough to walk-jump
             { x: 3400, width: 140 },
@@ -48,9 +48,9 @@ const ZONES = [
             { type: 'pillar', x: 1600, width: 40, height: 50 },
             { type: 'spike', x: 1850, width: 30, height: 15 },
 
-            // --- Beat B (2100 - 5200): first battery, then pits are introduced
+            // --- Beat B (2100 - 5200): first snack, then pits are introduced
             { type: 'platform', x: 2100, width: 120, height: 90 },
-            { type: 'battery', x: 2150, height: 115 }, // Early reward, impossible to miss
+            { type: 'snack', x: 2150, height: 115 }, // Early reward, impossible to miss
             { type: 'pillar', x: 2400, width: 40, height: 90 },
             { type: 'spike', x: 2650, width: 30, height: 15 },
             { type: 'pillar', x: 3150, width: 40, height: 50 },
@@ -72,10 +72,10 @@ const ZONES = [
             { type: 'platform', x: 7550, width: 150, height: 60 },
             { type: 'spike', x: 7750, width: 30, height: 15 },
 
-            // --- The checkpoint, mid-map on guaranteed solid ground
-            { type: 'feeder', x: 8000 },
+            // --- The checkpoint portal, mid-map on guaranteed solid ground
+            { type: 'portal', x: 8000 },
 
-            // --- Beat D (8250 - 11300): movers over pits, then the hidden battery
+            // --- Beat D (8250 - 11300): movers over pits, then the hidden snack
             { type: 'pillar', x: 8250, width: 40, height: 70 },
             { type: 'mover', x: 8480, width: 120, height: 95, axis: 'x', range: 230, speed: 1.8 },
             { type: 'spike', x: 8850, width: 30, height: 15 },
@@ -86,12 +86,12 @@ const ZONES = [
             { type: 'platform', x: 10050, width: 200, height: 120 },
             { type: 'spike', x: 10250, width: 30, height: 15 },
 
-            // The battery below is visible from the ground but out of reach from the low
+            // The snack below is visible from the ground but out of reach from the low
             // platform (apex from its slab tops out at 241). The only way up is the
             // invisible platform between them.
             { type: 'platform', x: 10800, width: 150, height: 40 },
             { type: 'platform', x: 11020, width: 100, height: 120, hidden: true },
-            { type: 'battery', x: 11050, height: 250 },
+            { type: 'snack', x: 11050, height: 250 },
             { type: 'spike', x: 11250, width: 30, height: 15 },
 
             // --- Beat E (11600 - 15100): everything at once, then a clean run to the portal

@@ -16,12 +16,23 @@
     <div id="damageFlash"></div>
 
     <div id="ui">
-        <div id="energyDisplay">Batteries: 0</div>
+        <div id="energyDisplay">Snacks: 0</div>
+        <!-- Hidden until the catnip stash is found -->
+        <div id="devPanel">
+            <span id="telemetry"></span>
+            <span id="catnipTag">🌿 CATNIP</span>
+        </div>
     </div>
     <div id="world">
-        <!-- Ground segments and pit voids are generated per zone by game.js -->
-        <div id="extractionPad"></div>
-        <div id="portal">🌀</div>
+        <!-- Ground segments, pit voids and the portal checkpoint are generated per zone by game.js -->
+        <!-- The goal: a cat feeder standing on the ground, stocked. Positioned by game.js. -->
+        <div id="goalFeeder" class="feeder active">
+            <div class="feeder-hopper"></div>
+            <div class="feeder-led"></div>
+            <div class="feeder-chute"></div>
+            <div class="feeder-bowl"></div>
+            <div class="feeder-kibble"></div>
+        </div>
         <div id="catContainer">
             <div id="meowBubble">I am Bumbot!!!</div>
             <div id="cat">🐈‍⬛</div>
@@ -29,11 +40,12 @@
     </div>
     <div id="winScreen">
         <h1 style="color: #2ecc71;">MISSION ACCOMPLISHED</h1>
-        <p id="finalScore">Bumbot safely made it to the station core!</p>
+        <p id="finalScore">Bumbot safely made it to his lunch!</p>
         <button id="winButton" onclick="handleWinButton()">Replay Zone</button>
     </div>
-    <div class="instructions">[← / →] Move &nbsp;&nbsp;&nbsp;&nbsp; [Space / ↑] Jump &nbsp;&nbsp;&nbsp;&nbsp; [M] Sonic Meow (Uses Batteries)</div>
 </div>
+
+<div class="instructions">[← / →] Move &nbsp;&nbsp;&nbsp;&nbsp; [Space / ↑] Jump &nbsp;&nbsp;&nbsp;&nbsp; [M] Sonic Meow (Uses Snacks)</div>
 
 <!-- Load Game Logic Files -->
 <script src="map.js"></script>

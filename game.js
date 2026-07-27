@@ -6,17 +6,17 @@ const energyDisplay = document.getElementById('energyDisplay');
 const winScreen = document.getElementById('winScreen');
 const winButton = document.getElementById('winButton');
 const finalScore = document.getElementById('finalScore');
-const portal = document.getElementById('portal');
-const extractionPad = document.getElementById('extractionPad');
+const goalFeeder = document.getElementById('goalFeeder');
 const farBuildings = document.getElementById('farBuildings');
 const nearBuildings = document.getElementById('nearBuildings');
+const devPanel = document.getElementById('devPanel');
+const telemetry = document.getElementById('telemetry');
 
 const windowWidth = 700;
 
-// Everything at the end of a zone is measured back from its right edge, so a zone's
-// length is now a single number in map.js instead of four hardcoded positions.
-const portalInset = 200;
-const padInset = 230;
+// The end of a zone is measured back from its right edge, so a zone's length is a single
+// number in map.js instead of several hardcoded positions.
+const goalInset = 200;
 const winInset = 220;
 
 let zoneIndex = 0;
@@ -32,7 +32,7 @@ let velocityY = 0;
 let isGrounded = true;
 let groundedOn = null; // The entity Bumbot is standing on, so movers can carry him
 let respawnX = zone.spawnX; // Moved forward by the cat feeder checkpoint
-let score = 1; // Acts as our battery fuel ammo clip counter
+let snacks = 1; // Snacks in the pouch; each one powers exactly one Sonic Meow
 let gameActive = true;
 let faceDirection = 1;
 
@@ -68,7 +68,115 @@ function playAudioTone(freq, type, duration) {
     osc.stop(audioCtx.currentTime + duration);
 }
 
+// --- The catnip stash: a hidden developer mode. Type CATNIP to toggle it.
+// Deliberately spelled with letters that are all unbound — any code containing M would fire a
+// Sonic Meow on every keystroke, which rules out MEOW, BUMBOT and most obvious words.
+// Session-only on purpose: nothing is persisted, so a reload is always a clean game.
+const catnipCode = 'CATNIP';
+const overclockMultiplier = 4; // Hold Shift: crosses zone 1 in ~10s instead of ~38s
+const warpStep = 1500;         // [ and ]
+let catnipBuffer = '';
+let catnipMode = false;
+let overclocking = false;
+let invulnerable = false;
+let ghostFrame = 0;   // Rate-limits the afterimage trail
+let fpsSmoothed = 60;
+
+// Shared by the CATNIP toggle and by loadZone, so there is exactly one teardown path
+function disableCatnip() {
+    const wasActive = catnipMode;
+    catnipMode = false;
+    overclocking = false;
+    invulnerable = false;
+    catnipBuffer = '';
+    cat.classList.remove('catnip');
+    devPanel.classList.remove('visible');
+    return wasActive;
+}
+
+function trackCatnipCode(e) {
+    if (!e.key || e.key.length !== 1) return;
+    catnipBuffer = (catnipBuffer + e.key.toUpperCase()).slice(-catnipCode.length);
+    if (catnipBuffer !== catnipCode) return;
+
+    if (catnipMode) {
+        disableCatnip();
+        playAudioTone(300, 'sine', 0.12);
+        return;
+    }
+
+    catnipBuffer = '';
+    catnipMode = true;
+    cat.classList.add('catnip');
+    devPanel.classList.add('visible');
+    // A rising trill: Bumbot found the good stuff
+    playAudioTone(523.25, 'triangle', 0.09);
+    setTimeout(() => playAudioTone(698.46, 'triangle', 0.09), 80);
+    setTimeout(() => playAudioTone(880, 'triangle', 0.16), 160);
+}
+
+// Warping must never drop Bumbot into a pit, so the landing x snaps out to solid ground
+function nearestSolidX(x) {
+    if (isOverSolidGround(x)) return x;
+    for (let offset = 10; offset <= 420; offset += 10) {
+        if (isOverSolidGround(x + offset)) return x + offset;
+        if (isOverSolidGround(x - offset)) return x - offset;
+    }
+    return zone.spawnX;
+}
+
+function catnipWarp(distance) {
+    if (!gameActive) return;
+    let target = catX + distance;
+    if (target < 0) target = 0;
+    if (target > worldWidth - 50) target = worldWidth - 50;
+
+    catX = nearestSolidX(target);
+    catY = 0;
+    velocityY = 0;
+    isGrounded = true;
+    groundedOn = null;
+    wasInAirBefore = false;
+    playAudioTone(760, 'triangle', 0.07);
+}
+
+function handleCatnipKeys(e) {
+    if (e.key === 'Shift') overclocking = true;
+    if (e.key === '[') catnipWarp(-warpStep);
+    if (e.key === ']') catnipWarp(warpStep);
+    if (e.key === 'g' || e.key === 'G') {
+        // Off by default even in catnip mode: testing hazards usually means wanting to die
+        invulnerable = !invulnerable;
+        playAudioTone(invulnerable ? 990 : 280, 'sine', 0.1);
+    }
+}
+
+function spawnAfterImage() {
+    const ghost = document.createElement('div');
+    ghost.classList.add('after-image');
+    ghost.innerText = '🐈‍⬛';
+    ghost.style.left = catX + 'px';
+    ghost.style.bottom = (40 + catY) + 'px';
+    ghost.style.transform = 'scaleX(' + (-faceDirection) + ')';
+    world.appendChild(ghost);
+    setTimeout(() => ghost.remove(), 360);
+}
+
+function updateTelemetry(dt) {
+    fpsSmoothed += ((60 / dt) - fpsSmoothed) * 0.1;
+    telemetry.innerText =
+        'x ' + Math.round(catX) +
+        ' · ' + Math.round(fpsSmoothed) + 'fps' +
+        ' · ' + (isGrounded ? 'ground' : 'air') +
+        (invulnerable ? ' · GOD' : '') +
+        (overclocking ? ' · RUSH' : '');
+}
+
 window.addEventListener('keydown', (e) => {
+    // Ahead of the gameActive guard, so the code still works while dead or on the win screen
+    trackCatnipCode(e);
+    if (catnipMode) handleCatnipKeys(e);
+
     if (!gameActive) return;
     if (e.key === 'ArrowLeft' || e.key === 'ArrowRight' || e.key === 'ArrowUp' || e.code === 'Space') {
         e.preventDefault();
@@ -79,6 +187,7 @@ window.addEventListener('keydown', (e) => {
 });
 
 window.addEventListener('keyup', (e) => {
+    if (e.key === 'Shift') overclocking = false; // Unguarded, so the rush can't stick on
     if (e.key === 'ArrowLeft' || e.key === 'ArrowRight' || e.key === 'ArrowUp' || e.code === 'Space') {
         const keyName = e.code === 'Space' ? 'Space' : e.key;
         keys[keyName] = false;
@@ -88,8 +197,8 @@ window.addEventListener('keyup', (e) => {
 let RuntimeEntities = [];
 let PigeonEntities = [];
 
-// Only these types take part in solid collision. Spikes, batteries and the feeder are
-// overlap-only, so they are handled in handleOverlapSystems instead.
+// Only these types take part in solid collision. Spikes, snacks and the checkpoint portal
+// are overlap-only, so they are handled in handleOverlapSystems instead.
 function isSolidType(type) {
     return type === 'pillar' || type === 'platform' || type === 'mover';
 }
@@ -110,8 +219,7 @@ function applyZoneGeometry() {
     worldWidth = zone.worldWidth;
     winX = worldWidth - winInset;
     world.style.width = worldWidth + 'px';
-    portal.style.left = (worldWidth - portalInset) + 'px';
-    extractionPad.style.left = (worldWidth - padInset) + 'px';
+    goalFeeder.style.left = (worldWidth - goalInset) + 'px';
 }
 
 function buildGround() {
@@ -123,7 +231,7 @@ function buildGround() {
         addGroundSegment(cursor, pit.x - cursor);
 
         const void_ = document.createElement('div');
-        void_.classList.add('pit');
+        void_.classList.add('pit', 'level-entity');
         void_.style.left = pit.x + 'px';
         void_.style.width = pit.width + 'px';
         world.appendChild(void_);
@@ -137,19 +245,22 @@ function buildGround() {
 function addGroundSegment(left, width) {
     if (width <= 0) return;
     const segment = document.createElement('div');
-    segment.classList.add('ground-segment');
+    segment.classList.add('ground-segment', 'level-entity');
     segment.style.left = left + 'px';
     segment.style.width = width + 'px';
     world.appendChild(segment);
 }
 
 function generateLevel() {
-    document.querySelectorAll('.obstacle, .spike, .platform, .battery, .pigeon, .mover, .feeder, .ground-segment, .pit').forEach(el => el.remove());
+    // Everything generated per zone carries .level-entity, so clearing never depends on
+    // an up-to-date list of type classes — and never touches the static goal feeder,
+    // which shares the .feeder class with nothing else in the world.
+    document.querySelectorAll('.level-entity').forEach(el => el.remove());
     RuntimeEntities = [];
     PigeonEntities = [];
 
     // Sync our top dashboard display panel instantly on load
-    energyDisplay.innerText = "Batteries: " + score;
+    energyDisplay.innerText = "Snacks: " + snacks;
     meowBubble.innerText = "I am Bumbot!!!";
 
     buildGround();
@@ -157,6 +268,7 @@ function generateLevel() {
     zone.objects.forEach((obj, index) => {
         const element = document.createElement('div');
         element.id = "ent-" + index;
+        element.classList.add('level-entity');
 
         if (obj.type === 'pillar') {
             element.classList.add('obstacle');
@@ -178,14 +290,13 @@ function generateLevel() {
             element.style.left = obj.x + 'px';
             element.style.width = obj.width + 'px';
             element.style.bottom = (40 + obj.height) + 'px';
-        } else if (obj.type === 'battery') {
-            element.classList.add('battery');
-            element.innerText = '🔋';
+        } else if (obj.type === 'snack') {
+            element.classList.add('snack'); // Drawn entirely in CSS, no glyph
             element.style.left = obj.x + 'px';
             element.style.bottom = (40 + obj.height) + 'px';
-        } else if (obj.type === 'feeder') {
-            element.classList.add('feeder');
-            element.innerHTML = '<div class="feeder-led"></div><div class="feeder-kibble"></div>';
+        } else if (obj.type === 'portal') {
+            element.classList.add('portal-checkpoint');
+            element.innerText = '🌀';
             element.style.left = obj.x + 'px';
         }
 
@@ -203,7 +314,7 @@ function generateLevel() {
 
     zone.pigeons.forEach((pig) => {
         const element = document.createElement('div');
-        element.classList.add('pigeon');
+        element.classList.add('pigeon', 'level-entity');
         element.innerText = '🕊️';
         element.style.left = pig.x + 'px';
         element.style.bottom = pig.y + 'px';
@@ -247,14 +358,51 @@ function createShatterBurst(originX, originY, obstacleHeight) {
     }
 }
 
+// Shared by the Sonic Meow and the catnip dash, so a smashed pillar looks and sounds
+// identical however it was smashed.
+function shatterEntity(ent) {
+    if (!ent.active) return;
+    ent.active = false;
+
+    createShatterBurst(ent.x, ent.y || 0, ent.height || 40);
+
+    const crackLayer = document.createElement('div');
+    crackLayer.classList.add('cracked');
+    ent.dom.appendChild(crackLayer);
+
+    ent.dom.style.transition = "transform 0.4s cubic-bezier(0.36, 0.07, 0.19, 0.97), opacity 0.4s ease-out";
+    ent.dom.style.transform = "scale(0) rotate(" + (Math.random() * 30 - 15) + "deg)";
+    ent.dom.style.opacity = "0";
+
+    setTimeout(() => ent.dom.remove(), 400);
+    playAudioTone(120, 'sawtooth', 0.2);
+}
+
+function vaporizePigeon(pig) {
+    if (!pig.active) return;
+    pig.active = false; // Stops the patrol clamp from resurrecting it
+
+    createShatterBurst(pig.x, pig.y, 20);
+    pig.dom.style.transition = "transform 0.3s ease-out, opacity 0.3s ease-out";
+    pig.dom.style.transform = "translateY(-50px) scale(0)";
+    pig.dom.style.opacity = "0";
+    setTimeout(() => pig.dom.remove(), 300);
+}
+
+// The catnip dash: Shift held in catnip mode. Nothing stops him — pillars and spikes
+// shatter, pigeons vaporize, pits are crossed as if the ground were whole.
+function isDashing() {
+    return catnipMode && overclocking;
+}
+
 function triggerSonicMeow() {
-    if (score <= 0) {
+    if (snacks <= 0) {
         playAudioTone(150, 'sine', 0.1);
         return;
     }
 
-    score--;
-    energyDisplay.innerText = "Batteries: " + score;
+    snacks--;
+    energyDisplay.innerText = "Snacks: " + snacks;
 
     playAudioTone(200, 'sawtooth', 0.4);
     playAudioTone(400, 'square', 0.4);
@@ -286,38 +434,15 @@ function triggerSonicMeow() {
     let viewRightBound = currentCameraX + windowWidth;
 
     // Core screen-clearing logic for pillars and spikes. Pits and movers are immune,
-    // which is what keeps the zone's route battery-free by design.
+    // which is what keeps the zone's route snack-free by design.
     RuntimeEntities.forEach(ent => {
         if (!ent.active || (ent.type !== 'pillar' && ent.type !== 'spike')) return;
-
-        if (ent.x >= viewLeftBound - 40 && ent.x <= viewRightBound) {
-            ent.active = false;
-
-            createShatterBurst(ent.x, ent.y || 0, ent.height || 40);
-
-            const crackLayer = document.createElement('div');
-            crackLayer.classList.add('cracked');
-            ent.dom.appendChild(crackLayer);
-
-            ent.dom.style.transition = "transform 0.4s cubic-bezier(0.36, 0.07, 0.19, 0.97), opacity 0.4s ease-out";
-            ent.dom.style.transform = "scale(0) rotate(" + (Math.random() * 30 - 15) + "deg)";
-            ent.dom.style.opacity = "0";
-
-            setTimeout(() => ent.dom.remove(), 400);
-            playAudioTone(120, 'sawtooth', 0.2);
-        }
+        if (ent.x >= viewLeftBound - 40 && ent.x <= viewRightBound) shatterEntity(ent);
     });
 
     // Also blast away visible pigeons
     PigeonEntities.forEach(pig => {
-        if (pig.active && pig.x >= viewLeftBound && pig.x <= viewRightBound) {
-            createShatterBurst(pig.x, pig.y, 20);
-            pig.active = false; // Stops the patrol clamp from resurrecting it
-            pig.dom.style.transition = "transform 0.3s ease-out, opacity 0.3s ease-out";
-            pig.dom.style.transform = "translateY(-50px) scale(0)";
-            pig.dom.style.opacity = "0";
-            setTimeout(() => pig.dom.remove(), 300);
-        }
+        if (pig.active && pig.x >= viewLeftBound && pig.x <= viewRightBound) vaporizePigeon(pig);
     });
 }
 
@@ -371,23 +496,18 @@ function handleOverlapSystems() {
 
     if (catX >= winX) {
         gameActive = false;
-        const hasNextZone = zoneIndex + 1 < ZONES.length;
-        winButton.innerText = hasNextZone ? 'Enter Next Zone' : 'Replay Zone';
-        finalScore.innerText = hasNextZone
-            ? "Bumbot cleared " + zone.name + " with " + score + " batteries to spare."
-            : "Bumbot safely made it to the station core!";
-        winScreen.style.display = 'flex';
-        playAudioTone(523.25, 'sine', 0.1);
-        setTimeout(() => playAudioTone(659.25, 'sine', 0.15), 100);
-        setTimeout(() => playAudioTone(783.99, 'sine', 0.3), 200);
+        startVictoryMunch();
         return;
     }
+
+    const dashing = isDashing();
 
     PigeonEntities.forEach(pig => {
         if (!pig.active) return;
         // The glyph floats inside a 40px box, so the hitbox is inset to match the bird
         if (catX < pig.x + 34 && catX + catWidth > pig.x + 6 && catY < pig.y + 32 && catY + catHeight > pig.y + 8) {
-            triggerShortCircuitReset();
+            if (dashing) vaporizePigeon(pig);
+            else triggerHurtReset();
         }
     });
 
@@ -397,21 +517,32 @@ function handleOverlapSystems() {
         if (obj.type === 'spike') {
             const base = obj.y || 0;
             if (catX < obj.x + obj.width && catX + catWidth > obj.x && catY < base + obj.height && catY + catHeight > base) {
-                triggerShortCircuitReset();
+                if (dashing) shatterEntity(obj);
+                else triggerHurtReset();
             }
         }
 
-        if (obj.type === 'battery') {
-            if (catX < obj.x + 25 && catX + catWidth > obj.x && catY < obj.height + 25 && catY + catHeight > obj.height) {
+        // Pillars are solid, so they are normally never checked here — only a dash can
+        // occupy the same space as one, and when it does the pillar loses.
+        if (dashing && obj.type === 'pillar') {
+            if (catX < obj.x + obj.width && catX + catWidth > obj.x && catY < obj.height && catY + catHeight > 0) {
+                shatterEntity(obj);
+            }
+        }
+
+        if (obj.type === 'snack') {
+            // 34 wide matches the drawn stick; the 25 of vertical reach is deliberately
+            // generous so a snack can be grabbed in passing at the top of a jump
+            if (catX < obj.x + 34 && catX + catWidth > obj.x && catY < obj.height + 25 && catY + catHeight > obj.height) {
                 obj.active = false;
                 obj.dom.remove();
-                score++;
-                energyDisplay.innerText = "Batteries: " + score;
+                snacks++;
+                energyDisplay.innerText = "Snacks: " + snacks;
                 playAudioTone(880, 'sine', 0.08);
             }
         }
 
-        if (obj.type === 'feeder' && !obj.triggered && catX + catWidth > obj.x) {
+        if (obj.type === 'portal' && !obj.triggered && catX + catWidth > obj.x) {
             obj.triggered = true;
             obj.dom.classList.add('active');
             respawnX = obj.x;
@@ -429,26 +560,81 @@ function handleOverlapSystems() {
     });
 }
 
-function triggerShortCircuitReset() {
+const munchDuration = 1900; // How long Bumbot eats before the win screen covers the scene
+
+// The win screen is a full-window overlay, so it has to wait: park Bumbot at the bowl,
+// let him actually eat, and only then declare the mission accomplished.
+function startVictoryMunch() {
+    catX = worldWidth - goalInset - 8; // Nose over the bowl
+    catY = 0;
+    velocityY = 0;
+    isGrounded = true;
+    groundedOn = null;
+
+    // update() has already stopped running, so the last frame has to be drawn by hand
+    catContainer.style.left = catX + 'px';
+    catContainer.style.bottom = '40px';
+    catContainer.style.setProperty('--face', -1); // Face the feeder
+    catContainer.classList.remove('cat-idle', 'cat-launch', 'cat-land');
+    cat.classList.add('munching');
+
+    // Kibble disappears partway through, so the bowl ends up visibly emptied
+    setTimeout(() => goalFeeder.classList.add('eaten'), 950);
+
+    for (let i = 0; i < 7; i++) {
+        setTimeout(() => playAudioTone(150 + (i % 3) * 45, 'square', 0.05), i * 230);
+    }
+
+    setTimeout(() => {
+        cat.classList.remove('munching');
+
+        const hasNextZone = zoneIndex + 1 < ZONES.length;
+        winButton.innerText = hasNextZone ? 'Enter Next Zone' : 'Replay Zone';
+        finalScore.innerText = hasNextZone
+            ? "Bumbot ate his way through " + zone.name + ", with " + snacks + " snacks to spare."
+            : "Bumbot safely made it to his lunch!";
+        winScreen.style.display = 'flex';
+
+        playAudioTone(523.25, 'sine', 0.1);
+        setTimeout(() => playAudioTone(659.25, 'sine', 0.15), 100);
+        setTimeout(() => playAudioTone(783.99, 'sine', 0.3), 200);
+    }, munchDuration);
+}
+
+function triggerHurtReset() {
     if (!gameActive) return;
+
+    // God mode shrugs the hit off. Falling still has to be handled, or Bumbot would drop
+    // through the world forever, so he gets fished out of the pit instead.
+    if (invulnerable) {
+        if (catY < 0) {
+            catX = nearestSolidX(catX);
+            catY = 0;
+            velocityY = 0;
+            isGrounded = true;
+            groundedOn = null;
+        }
+        return;
+    }
 
     // Step 1: Lock player controls and physics instantly
     gameActive = false;
 
-    // Step 2: Trigger heavy static electrical glitch synthesizer sequence sound profile
-    playAudioTone(90, 'sawtooth', 0.4);
-    playAudioTone(120, 'square', 0.4);
+    // Step 2: A pained descending yowl
+    playAudioTone(520, 'sawtooth', 0.18);
+    setTimeout(() => playAudioTone(340, 'sawtooth', 0.18), 90);
+    setTimeout(() => playAudioTone(190, 'square', 0.24), 180);
 
-    // Step 3: Inject CSS glitch classes to flash the interface and shake Bumbot
+    // Step 3: Flash the screen red and make Bumbot flinch
     const flashElement = document.getElementById('damageFlash');
     flashElement.style.display = 'block';
-    cat.classList.add('glitching');
+    cat.classList.add('hurt');
 
     // Step 4: Hold the frozen failure scene visible for 600 milliseconds before resetting
     setTimeout(() => {
         // Clear layout modifiers cleanly
         flashElement.style.display = 'none';
-        cat.classList.remove('glitching');
+        cat.classList.remove('hurt');
 
         // Back to the cat feeder if one has been passed, otherwise the zone's spawn
         catX = respawnX;
@@ -467,6 +653,17 @@ function triggerShortCircuitReset() {
 
 let activeDust = [];
 let wasInAirBefore = false; // Internal tracking state flag for gravity thresholds
+let idleFrames = 0;
+const idleThreshold = 180; // ~3 seconds of standing still before he settles
+
+// Restarting a CSS animation needs the class gone and a reflow forced in between,
+// otherwise a second jump in quick succession would not replay the squash.
+function playBodyAnimation(className, duration) {
+    catContainer.classList.remove('cat-launch', 'cat-land', 'cat-idle');
+    void catContainer.offsetWidth;
+    catContainer.classList.add(className);
+    setTimeout(() => catContainer.classList.remove(className), duration);
+}
 
 function createLandingDust(originX, originY) {
     // Generate 6 small smoke cloud rings expanding sideways outwards from Bumbot's paws
@@ -493,19 +690,25 @@ function stepPhysics(dt) {
     // 0. Move the platforms before the player, so a passenger rides along cleanly
     updateMovers(dt);
 
+    // Catnip rush. 4x of 7px is 28px per slice, still under the 40px pillar width, so
+    // sprinting cannot tunnel through a solid. While dashing nothing blocks him at all —
+    // solid collision is skipped and whatever he hits is destroyed in handleOverlapSystems.
+    const dashing = isDashing();
+    const speed = moveSpeed * (dashing ? overclockMultiplier : 1);
+
     // 1. Horizontal Inputs
     if (keys.ArrowRight) {
         faceDirection = 1;
-        cat.style.setProperty('--face', -1);
-        const step = moveSpeed * dt;
-        if (!checkSolidCollision(catX + step, catY)) catX += step;
+        catContainer.style.setProperty('--face', -1);
+        const step = speed * dt;
+        if (dashing || !checkSolidCollision(catX + step, catY)) catX += step;
         if (catX > worldWidth - 50) catX = worldWidth - 50;
     }
     if (keys.ArrowLeft) {
         faceDirection = -1;
-        cat.style.setProperty('--face', 1);
-        const step = moveSpeed * dt;
-        if (!checkSolidCollision(catX - step, catY)) catX -= step;
+        catContainer.style.setProperty('--face', 1);
+        const step = speed * dt;
+        if (dashing || !checkSolidCollision(catX - step, catY)) catX -= step;
         if (catX < 0) catX = 0;
     }
 
@@ -515,12 +718,14 @@ function stepPhysics(dt) {
         isGrounded = false;
         groundedOn = null;
         wasInAirBefore = true; // Flag that Bumbot took off
+        playBodyAnimation('cat-launch', 170);
     }
 
     if (!isGrounded) {
         velocityY -= gravity * dt;
         let nextY = catY + velocityY * dt;
-        let hitObj = checkSolidCollision(catX, nextY);
+        // Dashing runs straight through platforms and movers instead of landing on them
+        let hitObj = dashing ? null : checkSolidCollision(catX, nextY);
 
         if (hitObj) {
             if (velocityY < 0) {
@@ -544,10 +749,11 @@ function stepPhysics(dt) {
         catY = nextY;
 
         if (catY <= 0) {
-            if (isOverSolidGround(catX)) {
+            // Dashing treats every pit as if the ground were whole, so he runs straight over
+            if (isOverSolidGround(catX) || dashing) {
                 catY = 0; velocityY = 0; isGrounded = true; groundedOn = null;
             } else if (catY < fallDeathY) {
-                triggerShortCircuitReset(); // Fell into a pit
+                triggerHurtReset(); // Fell into a pit
                 return;
             }
         }
@@ -572,6 +778,7 @@ function stepPhysics(dt) {
     if (isGrounded && wasInAirBefore) {
         createLandingDust(catX, catY);
         wasInAirBefore = false; // Reset takeoff state flag
+        playBodyAnimation('cat-land', 190); // Absorbs the impact through his legs
         playAudioTone(250, 'sine', 0.04); // Deep quiet thump landing frequency note bleep
     }
 
@@ -654,6 +861,25 @@ function update(timestamp) {
     catContainer.style.left = catX + 'px';
     catContainer.style.bottom = (40 + catY) + 'px';
 
+    // Idle settling. Only kicks in while he is grounded and not being driven, and any input
+    // cancels it immediately so it can never fight the launch/land squash.
+    if (isGrounded && !keys.ArrowLeft && !keys.ArrowRight) {
+        idleFrames += dt;
+        if (idleFrames > idleThreshold) catContainer.classList.add('cat-idle');
+    } else {
+        idleFrames = 0;
+        catContainer.classList.remove('cat-idle');
+    }
+
+    // Catnip extras: a motion trail while sprinting, plus the diagnostics readout
+    if (catnipMode) {
+        ghostFrame++;
+        if (overclocking && (keys.ArrowLeft || keys.ArrowRight) && ghostFrame % 3 === 0) {
+            spawnAfterImage();
+        }
+        updateTelemetry(dt);
+    }
+
     // 5. Camera & Infinite Parallax Layer Tracking
     let cameraX = catX - (windowWidth / 2) + 25;
     if (cameraX < 0) cameraX = 0;
@@ -675,12 +901,22 @@ function loadZone(index) {
     catX = zone.spawnX; catY = 0; velocityY = 0; isGrounded = true; groundedOn = null;
     wasInAirBefore = false;
     respawnX = zone.spawnX; // A fresh run starts without the checkpoint
-    score = 1; // Restores your initial emergency blast charge on death/replay resets
+    snacks = 1; // Restores the one snack Bumbot always starts a run with
     gameActive = true;
     lastFrameTime = 0; // However long the win screen was up, it is not a game frame
 
-    energyDisplay.innerText = "Batteries: " + score;
+    energyDisplay.innerText = "Snacks: " + snacks;
     winScreen.style.display = 'none';
+
+    // Clear everything the victory sequence and idle settling left on him
+    cat.classList.remove('munching');
+    catContainer.classList.remove('cat-idle', 'cat-launch', 'cat-land');
+    idleFrames = 0;
+    goalFeeder.classList.remove('eaten'); // Refill the bowl for the next run
+
+    // A fresh run is a fresh run: the catnip wears off rather than carrying over
+    disableCatnip();
+
     generateLevel();
     requestAnimationFrame(update);
 }

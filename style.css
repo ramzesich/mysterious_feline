@@ -3,6 +3,7 @@ body {
     background: #111;
     font-family: 'Courier New', Courier, monospace;
     display: flex;
+    flex-direction: column; /* Game window with the instructions bar fused to its bottom */
     justify-content: center;
     align-items: center;
     height: 100vh;
@@ -15,7 +16,7 @@ body {
     height: 350px;
     background: linear-gradient(#1a1c2e, #0f101b);
     border: 4px solid #333;
-    border-radius: 10px;
+    border-radius: 10px 10px 0 0; /* The instructions bar rounds off the bottom */
     overflow: hidden;
 }
 #ui {
@@ -66,6 +67,7 @@ body {
     width: 50px;
     height: 42px; /* Decreased container height slightly to drop the bounds */
     z-index: 10;
+    transform-origin: bottom center; /* Squash, stretch and idle all pivot on his paws */
 }
 #cat {
     width: 100%;
@@ -74,10 +76,49 @@ body {
     line-height: 42px; /* Tight line height overrides text box centering and lowers the emoji */
     text-align: center;
     user-select: none;
-    transform: scaleX(var(--face, -1)); /* --face is set from JS: -1 faces right, 1 faces left */
+    transform: scaleX(var(--face, -1)); /* --face is set on #catContainer and inherits down */
     display: block; /* Forces clean geometric drawing bounds rather than character spacing */
-    filter: brightness(0) drop-shadow(1px 0px 0px white) drop-shadow(-1px 0px 0px white) drop-shadow(0px 1px 0px white) drop-shadow(0px -1px 0px white);
+    /* A black Bombay cat lit by the city rather than a white-outlined sprite: warm street
+       light catches one edge, cool bounce light the other, and the soft dark spread keeps
+       him separated from the buildings behind. The offsets look inverted because scaleX
+       mirrors the filter output too — as written, the warm edge lands top-RIGHT when he
+       faces right, matching #skyBg's glow in that corner. */
+    filter:
+        brightness(0)
+        drop-shadow(-1px -1px 0px rgba(255, 194, 128, 0.9))
+        drop-shadow(1px 1px 0px rgba(126, 170, 235, 0.6))
+        drop-shadow(0px 0px 5px rgba(0, 0, 0, 0.85));
 }
+/* Deliberately gentle: a real cat compresses on landing, it does not stretch like rubber. */
+@keyframes catLaunch {
+    0% { transform: scale(1, 1); }
+    45% { transform: scale(0.97, 1.05); }
+    100% { transform: scale(1, 1); }
+}
+@keyframes catLand {
+    0% { transform: scale(1, 1); }
+    40% { transform: scale(1.06, 0.9); }
+    100% { transform: scale(1, 1); }
+}
+.cat-launch { animation: catLaunch 0.16s ease-out; }
+.cat-land { animation: catLand 0.18s ease-out; }
+
+/* Standing still: slow breathing with an occasional weight shift, because perfect
+   stillness is the most mechanical thing a cat can do. One cycle covers three breaths
+   and one flick so both live in a single transform animation without fighting. */
+@keyframes catIdle {
+    0% { transform: scale(1, 1) rotate(0deg); }
+    12% { transform: scale(1.014, 0.986) rotate(0deg); }
+    25% { transform: scale(1, 1) rotate(0deg); }
+    37% { transform: scale(1.014, 0.986) rotate(0deg); }
+    50% { transform: scale(1, 1) rotate(0deg); }
+    62% { transform: scale(1.014, 0.986) rotate(0deg); }
+    74% { transform: scale(1, 1) rotate(0deg); }
+    86% { transform: scale(1, 1) rotate(-1.4deg); }
+    91% { transform: scale(1, 1) rotate(0.8deg); }
+    96%, 100% { transform: scale(1, 1) rotate(0deg); }
+}
+.cat-idle { animation: catIdle 6.2s ease-in-out infinite; }
 #meowBubble {
     position: absolute;
     background: white;
@@ -103,34 +144,52 @@ body {
     display: block;
     width: 0;
 }
+/* Cast concrete pillars. The key rule: NO repeating/periodic pattern — an even rhythm of
+   horizontal lines instantly reads as server racks or shelving instead of stone. Structure is
+   irregular grit, two broad off-centre blotches so no area matches another, vertical weather
+   streaks down the face, grime pooling at the base, and side lighting. Warm-grey rather than
+   blue-grey, and nearly square corners, because cast concrete is not rounded.
+   box-sizing is required — the border would otherwise render the pillar taller than the
+   height physics collides with. */
 .obstacle {
     position: absolute;
     bottom: 40px;
     width: 40px;
-    background: #c0392b;
-    border: 2px solid #e74c3c;
-    border-radius: 4px;
+    background:
+        radial-gradient(circle at 17% 12%, rgba(255, 255, 255, 0.10) 0 1.5px, transparent 1.5px),
+        radial-gradient(circle at 63% 27%, rgba(0, 0, 0, 0.18) 0 1.5px, transparent 1.5px),
+        radial-gradient(circle at 34% 46%, rgba(0, 0, 0, 0.14) 0 2px, transparent 2px),
+        radial-gradient(circle at 81% 58%, rgba(255, 255, 255, 0.07) 0 1.5px, transparent 1.5px),
+        radial-gradient(circle at 24% 73%, rgba(0, 0, 0, 0.16) 0 2px, transparent 2px),
+        radial-gradient(circle at 57% 89%, rgba(255, 255, 255, 0.06) 0 2px, transparent 2px),
+        radial-gradient(ellipse 26px 40px at 78% 22%, rgba(255, 255, 255, 0.05), transparent 70%),
+        radial-gradient(ellipse 30px 52px at 12% 62%, rgba(0, 0, 0, 0.12), transparent 70%),
+        linear-gradient(90deg, transparent 0 9px, rgba(0, 0, 0, 0.07) 9px 11px, transparent 11px 23px, rgba(0, 0, 0, 0.05) 23px 24px, transparent 24px),
+        linear-gradient(0deg, rgba(0, 0, 0, 0.3) 0 6px, transparent 6px 22px),
+        linear-gradient(100deg, #908d86 0%, #7a7771 38%, #63615c 78%, #514f4b 100%);
+    border: 1px solid #3c3a37;
+    border-top: 2px solid #a09c94; /* Weathered top edge catching the city light */
+    border-radius: 1px;
+    box-sizing: border-box;
 }
+/* Drawn as a sawtooth via clip-path rather than "▲▲▲" text. The glyph left ~7px of empty
+   line-box beneath it, so a spike mounted on a platform appeared to hover above the slab.
+   With clip-path the valleys sit exactly on the element's bottom edge. Bright steel keeps
+   these readable as blades against the concrete pillars. */
 .spike {
     position: absolute;
     bottom: 40px;
     width: 45px;
-    height: 25px;
-    font-size: 24px;
-    line-height: 25px;
-    text-align: center;
-    user-select: none;
-    color: #7f8c8d;
-    text-shadow: 1px 1px 0px #fff, -1px -1px 0px #000;
-    font-weight: bold;
+    height: 18px;
+    background: linear-gradient(#e4eaed 0%, #a7b0b5 45%, #666e73 100%);
+    clip-path: polygon(0% 100%, 16.7% 0%, 33.3% 100%, 50% 0%, 66.7% 100%, 83.3% 0%, 100% 100%);
+    filter: drop-shadow(0 1px 2px rgba(0, 0, 0, 0.6));
     z-index: 11;
 }
-.spike::before {
-    content: "▲▲▲";
-    display: block;
-}
 
-@keyframes bumbotShake {
+/* Flinch shake for taking a hit. Every keyframe has to re-state scaleX(var(--face)) or the
+   animation would clobber which way Bumbot faces. */
+@keyframes bumbotFlinch {
     0% { transform: translate(1px, 1px) scaleX(var(--face, -1)); }
     10% { transform: translate(-1px, -2px) scaleX(var(--face, -1)); }
     20% { transform: translate(-3px, 0px) scaleX(var(--face, -1)); }
@@ -143,9 +202,23 @@ body {
     90% { transform: translate(2px, 2px) scaleX(var(--face, -1)); }
     100% { transform: translate(1px, -2px) scaleX(var(--face, -1)); }
 }
-.glitching {
-    animation: bumbotShake 0.15s infinite;
-    filter: invert(1) sepia(1) saturate(5) hue-rotate(300deg) !important; /* Forces Bumbot to flash raw electrical red */
+.hurt {
+    animation: bumbotFlinch 0.15s infinite;
+    filter: invert(1) sepia(1) saturate(5) hue-rotate(300deg) !important; /* Flashes red to read as a hit */
+}
+
+/* Head-dip chewing loop for the victory sequence. Like bumbotFlinch, every keyframe has to
+   re-state scaleX(var(--face)) or the animation would clobber which way Bumbot faces. */
+@keyframes bumbotMunch {
+    0% { transform: translateY(0px) rotate(0deg) scaleX(var(--face, -1)); }
+    20% { transform: translateY(4px) rotate(-6deg) scaleX(var(--face, -1)); }
+    40% { transform: translateY(1px) rotate(-2deg) scaleX(var(--face, -1)); }
+    60% { transform: translateY(4px) rotate(-5deg) scaleX(var(--face, -1)); }
+    80% { transform: translateY(1px) rotate(-1deg) scaleX(var(--face, -1)); }
+    100% { transform: translateY(0px) rotate(0deg) scaleX(var(--face, -1)); }
+}
+.munching {
+    animation: bumbotMunch 0.45s ease-in-out infinite;
 }
 
 #damageFlash {
@@ -159,14 +232,25 @@ body {
     pointer-events: none;
 }
 
+/* Precast concrete slabs. Same material as the pillars, kept distinct three ways: vertical
+   segment joints instead of horizontal form lines, a lighter top-lit gradient, and a painted
+   blue safety edge. The edge colour is the behaviour cue — blue stands still, amber (.mover)
+   moves. box-sizing keeps the slab exactly 15px, matching the collision height. */
 .platform {
     position: absolute;
-    background: #2980b9;
-    border: 2px solid #3498db;
-    border-radius: 4px;
     height: 15px;
+    background:
+        radial-gradient(circle at 22% 40%, rgba(255, 255, 255, 0.08) 0 2px, transparent 2px),
+        radial-gradient(circle at 68% 65%, rgba(0, 0, 0, 0.16) 0 2px, transparent 2px),
+        repeating-linear-gradient(90deg, rgba(0, 0, 0, 0.16) 0 1px, transparent 1px 37px),
+        linear-gradient(#929088 0%, #78756f 45%, #5a5854 100%);
+    border: 1px solid #3c3a37;
+    border-top: 3px solid #4aa3df; /* Painted blue edge: safe to stand on, does not move */
+    border-radius: 2px;
+    box-sizing: border-box;
+    box-shadow: inset 0 -4px 7px rgba(0, 0, 0, 0.28);
 }
-/* Invisible until landed on, then permanently revealed. The battery floating above one of
+/* Invisible until landed on, then permanently revealed. The snack floating above one of
    these is the only hint that it exists. */
 .platform.hidden-platform {
     opacity: 0;
@@ -175,101 +259,204 @@ body {
 .platform.hidden-platform.revealed {
     opacity: 1;
 }
-/* Amber instead of the static platforms' blue, so "this one moves" reads instantly */
+/* Same concrete slab as .platform, but with an amber painted edge and a matching glow, so
+   "this one moves" is readable before it has moved. */
 .mover {
     position: absolute;
     height: 15px;
-    background: #8e5a1f;
-    border: 2px solid #d98c26;
-    border-radius: 4px;
-    box-shadow: 0 0 10px rgba(217, 140, 38, 0.45);
+    background:
+        radial-gradient(circle at 22% 40%, rgba(255, 255, 255, 0.08) 0 2px, transparent 2px),
+        radial-gradient(circle at 68% 65%, rgba(0, 0, 0, 0.16) 0 2px, transparent 2px),
+        repeating-linear-gradient(90deg, rgba(0, 0, 0, 0.16) 0 1px, transparent 1px 37px),
+        linear-gradient(#929088 0%, #78756f 45%, #5a5854 100%);
+    border: 1px solid #3c3a37;
+    border-top: 3px solid #d98c26; /* Painted amber edge: this slab travels */
+    border-radius: 2px;
+    box-sizing: border-box;
+    box-shadow: inset 0 -4px 7px rgba(0, 0, 0, 0.28), 0 0 10px rgba(217, 140, 38, 0.4);
 }
-.battery {
+/* A packaged cat treat stick, drawn rather than an emoji — Unicode has nothing stick-shaped
+   that reads as cat food. clip-path gives the pinched candy-wrapper silhouette; the
+   horizontal gradient is red wrapper / exposed meat / red wrapper with darker seams between
+   them, and ::after hatches the crimped end tabs. The red wrapper is the recognisable cue;
+   the brown centre keeps it tied to the feeder's kibble at the end of a zone. */
+.snack {
     position: absolute;
-    width: 25px;
-    height: 25px;
-    font-size: 22px;
-    line-height: 25px;
-    text-align: center;
-    user-select: none;
+    width: 34px;
+    height: 14px;
+    clip-path: polygon(0% 26%, 12% 26%, 18% 0%, 82% 0%, 88% 26%, 100% 26%, 100% 74%, 88% 74%, 82% 100%, 18% 100%, 12% 74%, 0% 74%);
+    background:
+        linear-gradient(rgba(255, 255, 255, 0.22), rgba(0, 0, 0, 0.3)),
+        linear-gradient(90deg,
+            #d62b2b 0 27%,
+            #8c1a1a 27% 29%,
+            #6f4210 29% 71%,
+            #8c1a1a 71% 73%,
+            #d62b2b 73% 100%);
+    /* clip-path would cut off an outer box-shadow, so the glow has to be a filter */
+    filter: drop-shadow(0 0 5px rgba(226, 62, 62, 0.55));
+    animation: snackBob 1.6s ease-in-out infinite alternate;
 }
-/* The checkpoint: an automatic cat feeder. ::before is the hopper, ::after the bowl, and
-   the two child divs are the status LED and the kibble that appears on activation. */
-.feeder {
+.snack::before {
+    /* Specular highlight along the top of the left wrapper */
+    content: '';
     position: absolute;
-    bottom: 40px;
-    width: 44px;
-    height: 72px;
-    z-index: 5;
+    top: 3px;
+    left: 6px;
+    width: 4px;
+    height: 2px;
+    border-radius: 1px;
+    background: rgba(255, 226, 222, 0.8);
 }
-.feeder::before {
+.snack::after {
+    /* Crimp hatching, painted only over the two narrow end tabs */
     content: '';
     position: absolute;
     top: 0;
+    left: 0;
+    width: 100%;
+    height: 100%;
+    background-image:
+        repeating-linear-gradient(90deg, rgba(0, 0, 0, 0.42) 0 1px, transparent 1px 3px),
+        repeating-linear-gradient(90deg, rgba(0, 0, 0, 0.42) 0 1px, transparent 1px 3px);
+    background-size: 5px 100%, 5px 100%;
+    background-position: left center, right center;
+    background-repeat: no-repeat;
+}
+
+/* Small objects are easy to miss at this size, so the snack bobs gently */
+@keyframes snackBob {
+    0% { transform: translateY(0px); }
+    100% { transform: translateY(-4px); }
+}
+/* The goal at the end of a zone: an automatic cat feeder. ::before is the hopper, ::after
+   the bowl, and the two child divs are the status LED and the kibble. The goal instance is
+   permanently `.active` (lunch is served); the class is reused so a dormant feeder is still
+   possible later. */
+/* The goal: an automatic cat feeder standing on the ground. Built from explicit child divs
+   rather than pseudo-elements so the parts can be layered and proportioned freely — a wide
+   shallow bowl with the kibble heaped *above* its rim, under a tapered hopper. Overall
+   42x50, only slightly taller than Bumbot himself. */
+.feeder {
+    position: absolute;
+    bottom: 40px;
+    width: 42px;
+    height: 50px;
+    z-index: 5;
+}
+.feeder-hopper {
+    position: absolute;
+    bottom: 19px;
     left: 7px;
-    width: 30px;
-    height: 46px;
+    width: 28px;
+    height: 31px;
     background: linear-gradient(#2b3149, #171a29);
     border: 2px solid #3d4a6b;
-    border-radius: 7px 7px 3px 3px;
+    border-radius: 6px 6px 2px 2px;
     box-sizing: border-box;
-}
-.feeder::after {
-    content: '';
-    position: absolute;
-    bottom: 0;
-    left: 2px;
-    width: 40px;
-    height: 18px;
-    background: #22273a;
-    border: 2px solid #3d4a6b;
-    border-radius: 0 0 20px 20px;
-    box-sizing: border-box;
+    /* Tapered towards the bottom so it reads as a dispenser, not a phone or a locker */
+    clip-path: polygon(0% 0%, 100% 0%, 78% 100%, 22% 100%);
 }
 .feeder-led {
     position: absolute;
-    top: 8px;
+    bottom: 40px;
     left: 19px;
-    width: 6px;
-    height: 6px;
+    width: 4px;
+    height: 4px;
     border-radius: 50%;
-    background: #5a2530; /* Dim red until Bumbot walks past */
+    background: #5a2530; /* Dim red when dormant */
+    z-index: 3;
+}
+.feeder-chute {
+    position: absolute;
+    bottom: 12px;
+    left: 16px;
+    width: 10px;
+    height: 8px;
+    background: #14171f;
+    border-left: 1px solid #3d4a6b;
+    border-right: 1px solid #3d4a6b;
+    box-sizing: border-box;
     z-index: 2;
 }
+.feeder-bowl {
+    position: absolute;
+    bottom: 0;
+    left: 0;
+    width: 42px;
+    height: 14px;
+    background: linear-gradient(#2a3043, #1b1f2c);
+    border: 2px solid #3d4a6b;
+    border-top-width: 1px;
+    border-radius: 3px 3px 20px 20px;
+    box-sizing: border-box;
+    box-shadow: inset 0 3px 5px rgba(0, 0, 0, 0.55);
+    z-index: 3;
+}
+/* Dry kibble heaped in the bowl and mounded over its rim, so the food is visible rather
+   than buried inside the bowl's silhouette. Sits above the bowl in z-order. */
 .feeder-kibble {
     position: absolute;
-    bottom: 5px;
-    left: 9px;
-    width: 26px;
-    height: 8px;
+    bottom: 7px;
+    left: 7px;
+    width: 28px;
+    height: 10px;
     background:
-        radial-gradient(circle at 20% 55%, #e8a13d 0 3px, transparent 3px),
-        radial-gradient(circle at 52% 35%, #d98c26 0 3px, transparent 3px),
-        radial-gradient(circle at 82% 60%, #c07a1c 0 3px, transparent 3px);
+        radial-gradient(circle at 12% 82%, #6f4210 0 2.5px, transparent 2.5px),
+        radial-gradient(circle at 30% 55%, #a2661d 0 2.7px, transparent 2.7px),
+        radial-gradient(circle at 48% 30%, #b0731f 0 2.6px, transparent 2.6px),
+        radial-gradient(circle at 66% 52%, #8a5412 0 2.7px, transparent 2.7px),
+        radial-gradient(circle at 86% 80%, #94591a 0 2.5px, transparent 2.5px),
+        radial-gradient(circle at 22% 96%, #7f4d12 0 2.3px, transparent 2.3px),
+        radial-gradient(circle at 52% 88%, #c07a1c 0 2.4px, transparent 2.4px),
+        radial-gradient(circle at 74% 96%, #6f4210 0 2.2px, transparent 2.2px);
     opacity: 0;
     transition: opacity 0.3s ease-out;
-    z-index: 2;
+    z-index: 4;
 }
-.feeder.active::before {
+.feeder.active .feeder-hopper {
     border-color: #1d6f7d;
+}
+.feeder.active .feeder-bowl {
+    border-color: #1d6f7d;
+    box-shadow: inset 0 3px 5px rgba(0, 0, 0, 0.55), 0 0 12px rgba(0, 240, 255, 0.3);
 }
 .feeder.active .feeder-led {
     background: #00f0ff;
-    box-shadow: 0 0 10px #00f0ff, 0 0 18px rgba(0, 240, 255, 0.6);
+    box-shadow: 0 0 8px #00f0ff, 0 0 15px rgba(0, 240, 255, 0.6);
 }
 .feeder.active .feeder-kibble {
     opacity: 1;
 }
-#portal {
+/* Declared after .active so it wins on equal specificity: the bowl empties as Bumbot eats */
+.feeder.eaten .feeder-kibble {
+    opacity: 0;
+}
+/* The mid-zone checkpoint. Dim and colourless until Bumbot walks past it, then it spins
+   up and glows, so its state is readable from a distance. */
+.portal-checkpoint {
     position: absolute;
     bottom: 40px;
-    width: 60px;
-    height: 90px;
-    font-size: 60px;
-    line-height: 90px;
+    width: 50px;
+    height: 70px;
+    font-size: 46px;
+    line-height: 70px;
     text-align: center;
     user-select: none;
-    /* left is set by game.js, measured back from the active zone's right edge */
+    opacity: 0.4;
+    filter: grayscale(1) brightness(0.7);
+    transition: opacity 0.4s ease-out, filter 0.4s ease-out;
+    z-index: 5;
+}
+.portal-checkpoint.active {
+    opacity: 1;
+    filter: drop-shadow(0 0 10px #00f0ff);
+    animation: portalSpin 3s linear infinite;
+}
+
+@keyframes portalSpin {
+    0% { transform: rotate(0deg); }
+    100% { transform: rotate(360deg); }
 }
 #winScreen {
     display: none;
@@ -293,14 +480,21 @@ button {
     margin-top: 20px;
 }
 button:hover { background: #27ae60; }
+/* Fused to the bottom of the game window as one continuous frame: no top border of its own,
+   so the window's 4px bottom border becomes the single divider between them, and only the
+   lower corners are rounded. 708px + border-box matches #gameWindow's outer width
+   (700 content + its 4px side borders). */
 .instructions {
-    position: absolute;
-    bottom: 10px;
-    width: 100%;
+    width: 708px;
+    box-sizing: border-box;
+    padding: 7px 10px;
     text-align: center;
     font-size: 12px;
     color: #888;
-    z-index: 30;
+    background: linear-gradient(#1a1c2e, #14161f);
+    border: 4px solid #333;
+    border-top: none;
+    border-radius: 0 0 10px 10px;
     user-select: none;
 }
 #skyBg {
@@ -346,6 +540,59 @@ button:hover { background: #27ae60; }
     opacity: 0.85;
     z-index: 3;
 }
+/* --- Catnip (hidden dev mode). Nothing here is visible until CATNIP is typed. --- */
+#devPanel {
+    display: none;
+    align-items: center;
+    gap: 12px;
+    font-size: 12px;
+}
+#devPanel.visible {
+    display: flex;
+}
+#catnipTag {
+    color: #8ef2a4;
+    text-shadow: 0 0 8px rgba(142, 242, 164, 0.85);
+    letter-spacing: 1px;
+}
+#telemetry {
+    color: #00f0ff;
+    font-weight: normal;
+    font-size: 11px;
+    opacity: 0.85;
+    text-shadow: 1px 1px black;
+}
+/* Bumbot's outline turns catnip-green while the rush is available */
+#cat.catnip {
+    filter:
+        brightness(0)
+        drop-shadow(1px 0px 0px #8ef2a4) drop-shadow(-1px 0px 0px #8ef2a4)
+        drop-shadow(0px 1px 0px #8ef2a4) drop-shadow(0px -1px 0px #8ef2a4)
+        drop-shadow(0 0 7px rgba(142, 242, 164, 0.9));
+}
+/* Motion trail spawned every third frame while sprinting */
+.after-image {
+    position: absolute;
+    width: 50px;
+    height: 42px;
+    font-size: 45px;
+    line-height: 42px;
+    text-align: center;
+    pointer-events: none;
+    user-select: none;
+    z-index: 9;
+    filter:
+        brightness(0)
+        drop-shadow(1px 0px 0px #8ef2a4) drop-shadow(-1px 0px 0px #8ef2a4)
+        drop-shadow(0px 1px 0px #8ef2a4) drop-shadow(0px -1px 0px #8ef2a4);
+    animation: afterImageFade 0.36s ease-out forwards;
+}
+
+@keyframes afterImageFade {
+    0% { opacity: 0.5; }
+    100% { opacity: 0; }
+}
+
 .dust-particle {
     position: absolute;
     width: 6px;
@@ -355,24 +602,12 @@ button:hover { background: #27ae60; }
     pointer-events: none;
     z-index: 9;
 }
-#extractionPad {
-    position: absolute;
-    bottom: 40px;
-    width: 120px;
-    height: 12px;
-    background: #2b2b2b;
-    border-top: 4px solid #00f0ff; /* Cyberpunk cyan glow accent strip */
-    box-shadow: 0px -4px 15px rgba(0, 240, 255, 0.7);
-    border-radius: 2px;
-    z-index: 6;
-    /* left is set by game.js, 30px left of the portal */
-}
 .rubble-particle {
     position: absolute;
     width: 6px;
     height: 6px;
-    background: #e74c3c;
-    border: 1px solid #c0392b;
+    background: #7d7a74; /* Concrete chips, matching what they break off */
+    border: 1px solid #46443f;
     border-radius: 1px;
     pointer-events: none;
     z-index: 25;
