@@ -1,11 +1,13 @@
 # Bumbot — browser platformer
 
 A zone-based side-scrolling platformer. Play as Bumbot — a live black Bombay cat, **not** a
-robot, despite what the old `triggerShortCircuitReset`/battery naming used to imply — across a
-cyberpunk city to the cat feeder waiting at the far end, dodging spikes, pits and pigeon
-drones, collecting snacks, and using the Sonic Meow to clear obstacles. Zone 1
-(`neon-outskirts`) is 16000px, with a checkpoint portal at its midpoint. Keep copy, comments
-and new mechanics feline rather than mechanical.
+robot, despite what the old `triggerShortCircuitReset`/battery naming used to imply — running
+across the **rooftops** of a cyberpunk city to the cat feeder waiting at the far end, dodging
+razor wire, the alleys between buildings, and pigeons both airborne and on foot; collecting
+snacks, and using the Sonic Meow to clear obstacles. Zone 1 (`neon-outskirts`) is 16000px of
+thirteen rooftops, with a checkpoint vent pipe at its midpoint. Keep copy, comments and new
+mechanics feline rather than mechanical, and keep new scenery *rooftop* — if a thing wouldn't
+plausibly be bolted to the top of a building, it doesn't belong up here.
 
 ## Running it
 
@@ -14,10 +16,11 @@ No build, no dependencies, no tests, no lint. Open `index.html` in a browser
 `map.js` defines `ZONES`, then `game.js` consumes it. There is no module system —
 don't add `import`/`export` without also changing the script tags.
 
-Verify changes by actually playing: move right, jump onto a platform, hit a spike (death
-flash + respawn), fall into a pit, ride a mover, pass the checkpoint portal then die (should
-respawn at the portal), press `M` (ripple + obstacles shatter), reach the feeder and watch
-the munch sequence before the win screen.
+Verify changes by actually playing: climb out of the spawn pipe, move right, jump onto a
+catwalk, touch razor wire (death flash + respawn out of a pipe), fall into an alley, ride a
+gondola, walk into a strutting pigeon, pass the checkpoint pipe then die (should respawn there),
+press `M` (ripple + installations shatter), reach the feeder and watch the munch sequence before
+the win screen.
 
 ## Files
 
@@ -59,22 +62,48 @@ That `40` is hardcoded in ~10 places (entity spawning, particles, dust, movers, 
 container). Any new entity or effect must follow the same convention or it will float/sink by
 40px. Horizontal `left` is absolute world-space; `#world` is shifted by the camera instead.
 
+Two rendering corrections keep that convention *visually* honest, and they were tuned against
+each other — change one and re-check the other:
+
+- `.ground-segment` and `.pit` are 40px tall with `box-sizing: border-box`. The segment's 4px
+  `border-top` would otherwise paint the walkable surface at 44px while physics stands at 40.
+- The 🐈‍⬛ glyph leaves unpainted descender space under his paws, so `--paw-drop` (`:root`,
+  5px) shifts every drawing of him down: `#cat`'s transform, the `bumbotMunch` keyframes
+  (which override that transform, hence the `calc()`s), and the dash after-images in
+  `spawnAfterImage()`. Walking pigeons reuse it in `pigeonStrut` for the same reason.
+- Pigeons follow the `40 + y` convention like everything else. They used to be written as
+  `bottom = pig.y` while collision compared `pig.y` against ground-relative `catY`, so every
+  flyer rendered 40px below its own hitbox.
+
 ## Entity model
 
 `generateLevel()` turns each `zone.objects` entry into a DOM div plus a `RuntimeEntities`
 record (`{...obj, dom, active}`); `zone.pigeons` become `PigeonEntities`.
 
-- `pillar` — solid box from y=0 to `height`.
+- `pillar` — solid box from y=0 to `height`. Rendered as a roof installation: an optional
+  `variant` (`hatch` / `ac` / `fan` / `tank` / `stack`) becomes a second CSS class, and
+  `rooftopVariant()` derives one from the height when the data omits it, so no pillar ever
+  renders as an anonymous grey box.
 - `platform` — thin solid slab occupying y=`height`..`height+15`. Blocks from above *and*
   below (rising into one zeroes velocity); it is not a jump-through platform. With
-  `hidden: true` it renders invisible and is revealed permanently on first landing.
+  `hidden: true` it renders invisible and is revealed permanently on first landing. Reads as a
+  service catwalk: `::after` is the under-truss, `::before` the support legs, both masked to
+  fade downward — only the 15px slab collides, so the legs must never look solid.
 - `mover` — a platform that oscillates. `axis: 'x'` slides between `baseX` and
-  `baseX + range`; `axis: 'y'` raises between `baseHeight` and `baseHeight + range`.
-- `spike` — lethal, overlap-only. Optional `y` mounts it on a slab (`y = height + 15`).
+  `baseX + range`; `axis: 'y'` raises between `baseHeight` and `baseHeight + range`. The axis
+  also picks the machinery class (`mover-x` = gondola on cables, `mover-y` = hoist on a mast).
+- `spike` — lethal, overlap-only. Optional `y` mounts it on a slab (`y = height + 15`), where
+  it reads as razor wire strung along a catwalk edge. The coils are drawn by a ring gradient
+  rather than a `clip-path`, because the silhouette needs to be transparent *between* loops.
 - `snack` — a collectible cat treat stick, overlap-only, +1 meow charge. Drawn purely in CSS
   (`.snack` plus its two pseudo-elements), not a glyph.
-- `portal` — the mid-zone checkpoint, overlap-only. Passing it sets `respawnX`, and `.active`
-  switches it from dim/grey to spinning and glowing.
+- `portal` — the mid-zone checkpoint, overlap-only. Passing it sets `respawnX` to
+  `obj.x + 14` (just clear of the pipe mouth) and adds `.active`, which lights the pipe from
+  inside.
+- `pipe` — the same `.vent-pipe` drawing as the portal, permanently `.active`, and pure
+  scenery: absent from `isSolidType()`/`isSlabType()`, from the meow sweep and from
+  `handleOverlapSystems()`. One sits at the zone spawn so Bumbot's arrival matches his
+  respawns.
 
 The zone's *goal* is a cat feeder (`#goalFeeder`), a static child of `#world` positioned by
 `applyZoneGeometry()` — not a level object. It shares the `.feeder` class with nothing else,
@@ -92,12 +121,15 @@ disagree — spikes are `width: 30` in data but 45px in CSS; the cat hitbox is 3
 don't "fix" the mismatch casually.
 
 **Material language:** pillars, platforms and movers are all cast concrete (irregular grit +
-blotch + gradient background stacks, warm grey). The important constraint is **no periodic
-pattern on the pillars** — an even rhythm of horizontal lines makes a grey box read as a
-server rack or shelving unit, not stone. Behaviour is encoded in the painted top edge, not the
-body: blue = a static platform, amber = a mover, pale = a pillar's weathered cap. All three
-set `box-sizing: border-box`, which is required — their borders would otherwise render them
-taller than the height physics collides with.
+blotch + gradient background stacks, warm grey), with a thin machine skin over the top of each
+installation. The important constraint is **no periodic pattern on a pillar's face** — an even
+rhythm of horizontal lines makes a grey box read as a server rack or shelving unit, not stone.
+(Periodic detail *is* right for things that are genuinely repetitive: roofing seams on the deck,
+the louvres inside an `ac` unit's plainly machine-shaped panel, the loops of a wire coil.)
+Behaviour is encoded in the painted top edge, not the body: blue = a static platform, amber = a
+mover, pale = a pillar's weathered cap. All three set `box-sizing: border-box`, which is
+required — their borders would otherwise render them taller than the height physics collides
+with.
 
 ## Ground, pits and falling
 
@@ -106,10 +138,34 @@ stretch between the zone's `pits`, plus a `.pit` void div per gap. `isOverSolidG
 tests the cat's *centre* (x + 17) against the pit list, which keeps ledges forgiving instead
 of making a 1px overhang fatal.
 
+Visually a segment is a building's roof — only its top few px are the deck Bumbot runs on, and
+the rest of the 40px band is the storey below falling into shadow. A `.pit` is the alley between
+two buildings, with a sodium street glow at the bottom of it. `.ground-segment::before/::after`
+paint a 9px parapet coping on each end of every segment, which is what makes a gap read as the
+space between two buildings rather than a hole in a floor. Those lips are **decoration only** —
+Bumbot walks straight through them, and that's the deliberate trade.
+
 Consequences worth knowing: the ground clamp at `catY <= 0` is now conditional, falling past
 `fallDeathY` triggers the death reset, and the standing branch has to re-check support every
 frame. A pit is the one hazard a meow cannot remove — that's deliberate, and it's what keeps
 the no-snack route honest.
+
+## Pigeons
+
+`zone.pigeons` entries carry `{x, y, axis, min, max, speed}`. `axis: 'x'` patrols horizontally
+in the air, `'y'` hovers up and down, and `'walk'` struts along a surface (`y: 0` is the roof
+deck, a slab height puts one on a catwalk). All three are equally lethal on contact and all
+three die to a meow or a catnip dash, so a walker needs no new collision code.
+
+Walkers are crows (`🐦‍⬛`) lit like Bumbot rather than outlined like the flyers — flattened by
+`brightness(0)`, lifted to slate grey by `invert()` (that order matters: brightness first crushes
+the glyph to one flat shape, so nothing blows out), then warm/cool edge-lit. The flyers' hard red
+outline made a pale-headed bird glyph read as a detached head hopping along the deck. They keep
+no warning colour: a walker's threat reads from the fact that it walks at you. `pigeonStrut` owns
+their `transform`, so their facing travels as `--wing` for the keyframes to re-state — the same
+trick `--face` plays for Bumbot, and it mirrors the rim light with him too. Placement rules live
+in `map.js`'s header: patrol range inside one roof, speed ≤ 2, never on the landing side of an
+alley.
 
 ## Movers and carrying
 
@@ -143,12 +199,17 @@ entirely** — whoever cleared the flag must restart it with `requestAnimationFr
 restart sites: `triggerHurtReset()` (after 600ms) and `loadZone()`.
 
 Two reset paths, deliberately different:
-- `triggerHurtReset()` (death) — returns to `respawnX` (the checkpoint portal if
-  passed, else the zone's spawn), keeping score and level state.
+- `triggerHurtReset()` (death) — returns to `respawnX` (the checkpoint pipe if passed, else the
+  zone's spawn), keeping score and level state.
 - `loadZone(i)` — full reload: geometry, score back to 1, `respawnX` back to spawn, level
   regenerated, victory-munch classes cleared. `handleWinButton()` and `resetGame()` both route
   through it, and `handleWinButton` is called from an inline `onclick` in `index.html`, so it
   must stay a global function.
+
+Both end by calling `playPipeEmerge()`, because both spawn points have a `pipe`/`portal` in the
+level data and Bumbot always arrives by climbing out of one. That helper goes through
+`playBodyAnimation()`, so `cat-emerge` has to stay in that function's removal list or a second
+emerge won't replay.
 
 ## Winning (the munch sequence)
 

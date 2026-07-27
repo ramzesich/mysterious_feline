@@ -208,6 +208,16 @@ function isSlabType(type) {
     return type === 'platform' || type === 'mover';
 }
 
+// Which piece of roof machinery a pillar is. The map data can name it outright; without one,
+// height decides, so no pillar ever renders as an anonymous grey box.
+function rooftopVariant(obj) {
+    if (obj.variant) return obj.variant;
+    if (obj.height <= 45) return 'hatch';
+    if (obj.height <= 65) return 'ac';
+    if (obj.height <= 95) return 'tank';
+    return 'stack';
+}
+
 // A pit is only fatal once Bumbot's centre is past its edge, which keeps the edges
 // forgiving rather than making a 1px overhang deadly.
 function isOverSolidGround(x) {
@@ -271,7 +281,7 @@ function generateLevel() {
         element.classList.add('level-entity');
 
         if (obj.type === 'pillar') {
-            element.classList.add('obstacle');
+            element.classList.add('obstacle', rooftopVariant(obj));
             element.style.left = obj.x + 'px';
             element.style.width = obj.width + 'px';
             element.style.height = obj.height + 'px';
@@ -286,7 +296,8 @@ function generateLevel() {
             element.style.width = obj.width + 'px';
             element.style.bottom = (40 + obj.height) + 'px';
         } else if (obj.type === 'mover') {
-            element.classList.add('mover');
+            // The axis class picks the machinery: a gondola on cables or a hoist on a mast
+            element.classList.add('mover', obj.axis === 'y' ? 'mover-y' : 'mover-x');
             element.style.left = obj.x + 'px';
             element.style.width = obj.width + 'px';
             element.style.bottom = (40 + obj.height) + 'px';
@@ -294,9 +305,11 @@ function generateLevel() {
             element.classList.add('snack'); // Drawn entirely in CSS, no glyph
             element.style.left = obj.x + 'px';
             element.style.bottom = (40 + obj.height) + 'px';
-        } else if (obj.type === 'portal') {
-            element.classList.add('portal-checkpoint');
-            element.innerText = '🌀';
+        } else if (obj.type === 'portal' || obj.type === 'pipe') {
+            // Both are the same vent pipe. The checkpoint lights up when reached; a plain
+            // 'pipe' is scenery that Bumbot climbs out of and is lit from the start.
+            element.classList.add('vent-pipe'); // Drawn entirely in CSS, no glyph
+            if (obj.type === 'pipe') element.classList.add('active');
             element.style.left = obj.x + 'px';
         }
 
@@ -314,10 +327,16 @@ function generateLevel() {
 
     zone.pigeons.forEach((pig) => {
         const element = document.createElement('div');
+        const walker = pig.axis === 'walk'; // Struts the deck instead of patrolling the air
         element.classList.add('pigeon', 'level-entity');
-        element.innerText = '🕊️';
+        if (walker) element.classList.add('walker');
+        // A crow on foot rather than a pigeon: the dark body takes the red outline as a rim
+        // light, where the pale-headed bird glyph wore it as a halo.
+        element.innerText = walker ? '🐦‍⬛' : '🕊️';
         element.style.left = pig.x + 'px';
-        element.style.bottom = pig.y + 'px';
+        // Same ground-relative convention as every other entity, and the same one the collision
+        // check below already assumed — pigeons used to render 40px below their own hitbox.
+        element.style.bottom = (40 + pig.y) + 'px';
         world.appendChild(element);
 
         PigeonEntities.push({
@@ -545,7 +564,7 @@ function handleOverlapSystems() {
         if (obj.type === 'portal' && !obj.triggered && catX + catWidth > obj.x) {
             obj.triggered = true;
             obj.dom.classList.add('active');
-            respawnX = obj.x;
+            respawnX = obj.x + 14; // Just clear of the pipe mouth, so the emerge lands him on deck
 
             meowBubble.innerText = "Checkpoint!";
             meowBubble.style.display = 'block';
@@ -565,7 +584,10 @@ const munchDuration = 1900; // How long Bumbot eats before the win screen covers
 // The win screen is a full-window overlay, so it has to wait: park Bumbot at the bowl,
 // let him actually eat, and only then declare the mission accomplished.
 function startVictoryMunch() {
-    catX = worldWidth - goalInset - 8; // Nose over the bowl
+    // Standing beside the bowl, not on top of it: his 50px box parked flush over the feeder hid
+    // the whole thing, so the emptying kibble — the point of the sequence — was invisible.
+    // 38px back puts his nose at the rim with the bowl left in clear view.
+    catX = worldWidth - goalInset - 38;
     catY = 0;
     velocityY = 0;
     isGrounded = true;
@@ -643,6 +665,8 @@ function triggerHurtReset() {
         isGrounded = true;
         groundedOn = null;
         wasInAirBefore = false;
+        catContainer.style.setProperty('--face', -1); // Out of the pipe facing the way he runs
+        playPipeEmerge();
 
         // Re-engage main updating runtime loops loop
         gameActive = true;
@@ -659,10 +683,18 @@ const idleThreshold = 180; // ~3 seconds of standing still before he settles
 // Restarting a CSS animation needs the class gone and a reflow forced in between,
 // otherwise a second jump in quick succession would not replay the squash.
 function playBodyAnimation(className, duration) {
-    catContainer.classList.remove('cat-launch', 'cat-land', 'cat-idle');
+    catContainer.classList.remove('cat-launch', 'cat-land', 'cat-idle', 'cat-emerge');
     void catContainer.offsetWidth;
     catContainer.classList.add(className);
     setTimeout(() => catContainer.classList.remove(className), duration);
+}
+
+// Every place Bumbot appears — the zone opening and every respawn — he is coming out of a vent
+// pipe, so both spawn points have one in the level data and both play this.
+function playPipeEmerge() {
+    playBodyAnimation('cat-emerge', 420);
+    playAudioTone(300, 'sine', 0.07);
+    setTimeout(() => playAudioTone(460, 'sine', 0.09), 120);
 }
 
 function createLandingDust(originX, originY) {
@@ -782,7 +814,7 @@ function stepPhysics(dt) {
         playAudioTone(250, 'sine', 0.04); // Deep quiet thump landing frequency note bleep
     }
 
-    // 3. Update Avian Drones
+    // 3. Update the pigeons — the drones circling overhead and the ones strutting the deck
     PigeonEntities.forEach(pig => {
         if (!pig.active) return;
         const travel = pig.speed * pig.dir * dt;
@@ -791,13 +823,21 @@ function stepPhysics(dt) {
             pig.y += travel;
             if (pig.y >= pig.max) { pig.y = pig.max; pig.dir = -1; }
             else if (pig.y <= pig.min) { pig.y = pig.min; pig.dir = 1; }
-            pig.dom.style.bottom = pig.y + 'px';
+            pig.dom.style.bottom = (40 + pig.y) + 'px';
         } else {
+            // Both 'x' (hovering patrol) and 'walk' (strutting the roof) travel horizontally;
+            // a walker's y never changes, so it is only written once, at spawn.
             pig.x += travel;
             if (pig.x >= pig.max) { pig.x = pig.max; pig.dir = -1; }
             else if (pig.x <= pig.min) { pig.x = pig.min; pig.dir = 1; }
             pig.dom.style.left = pig.x + 'px';
-            pig.dom.style.transform = pig.dir === 1 ? 'scaleX(-1)' : 'scaleX(1)';
+            if (pig.axis === 'walk') {
+                // The strut animation owns `transform`, so facing has to travel as a variable
+                // the keyframes re-state — the same trick --face plays for Bumbot.
+                pig.dom.style.setProperty('--wing', pig.dir === 1 ? -1 : 1);
+            } else {
+                pig.dom.style.transform = pig.dir === 1 ? 'scaleX(-1)' : 'scaleX(1)';
+            }
         }
     });
 
@@ -910,7 +950,8 @@ function loadZone(index) {
 
     // Clear everything the victory sequence and idle settling left on him
     cat.classList.remove('munching');
-    catContainer.classList.remove('cat-idle', 'cat-launch', 'cat-land');
+    catContainer.classList.remove('cat-idle', 'cat-launch', 'cat-land', 'cat-emerge');
+    catContainer.style.setProperty('--face', -1);
     idleFrames = 0;
     goalFeeder.classList.remove('eaten'); // Refill the bowl for the next run
 
@@ -918,6 +959,7 @@ function loadZone(index) {
     disableCatnip();
 
     generateLevel();
+    playPipeEmerge(); // The zone opens with him climbing out onto the roof
     requestAnimationFrame(update);
 }
 

@@ -46,27 +46,70 @@ body {
     z-index: 10;
     /* width is set by game.js from the active zone's worldWidth */
 }
-/* One segment per stretch of solid ground between the zone's pits. Height 40 plus a 4px
-   lip, without box-sizing, exactly as the old single #ground div rendered. */
+/* One segment per stretch of solid ground between the zone's pits — and each one is the roof
+   of a building, not a floor. Only the top few px are the deck Bumbot runs on; the rest of the
+   40px band is the building's top storey falling away into shadow, which is what gives the
+   whole zone its height. Unlike the installations, periodic detail is wanted here: roofing felt
+   really is laid in even seams. */
 .ground-segment {
     position: absolute;
     bottom: 0;
     height: 40px;
-    background: #222;
-    border-top: 4px solid #444;
+    background:
+        /* Loose gravel scattered across the deck. Hand-placed on a 160px cycle so a long roof
+           does not read as one texture swatch tiled over and over. */
+        radial-gradient(circle 1.6px at 18px 5px, rgba(255, 255, 255, 0.13), transparent),
+        radial-gradient(circle 1.3px at 47px 8px, rgba(0, 0, 0, 0.30), transparent),
+        radial-gradient(circle 1.8px at 79px 4px, rgba(255, 255, 255, 0.10), transparent),
+        radial-gradient(circle 1.4px at 104px 9px, rgba(0, 0, 0, 0.26), transparent),
+        radial-gradient(circle 1.5px at 133px 6px, rgba(255, 255, 255, 0.09), transparent),
+        radial-gradient(circle 1.2px at 152px 10px, rgba(0, 0, 0, 0.22), transparent),
+        /* Felt seams, running with the roof */
+        repeating-linear-gradient(90deg, rgba(0, 0, 0, 0.22) 0 2px, transparent 2px 96px),
+        /* The deck surface, then the storey below it dropping into the dark */
+        linear-gradient(#4a4741 0 7px, #2f2d29 7px 13px, #1b1a18 13px 26px, #100f0e 26px 100%);
+    background-repeat: repeat-x;
+    background-size: 160px 100%, 160px 100%, 160px 100%, 160px 100%, 160px 100%, 160px 100%,
+                     96px 100%, 100% 100%;
+    border-top: 4px solid #5b574f; /* The concrete coping cap you actually land on */
     box-sizing: border-box; /* Same reason as the concrete: the border must not push the walkable top above 40px */
 }
-/* The void inside a gap. The amber lips are the readability cue: a pit has to be obvious
-   at a glance, since falling in is fatal and no meow can clear it. */
+/* Parapets. Every roof is walled at both ends, which is the single strongest cue that a gap is
+   the space between two buildings rather than a hole in a floor. Purely decorative — Bumbot
+   walks straight through these 9px lips, and that is the deliberate trade for the read. The
+   amber top line is the danger language the pit borders used to carry. */
+.ground-segment::before,
+.ground-segment::after {
+    content: '';
+    position: absolute;
+    top: -9px;
+    width: 13px;
+    height: 9px;
+    background: linear-gradient(#6b665c 0 2px, #514d46 2px 5px, #3a3732 5px 100%);
+    border-top: 1px solid rgba(255, 159, 28, 0.55);
+    box-sizing: border-box;
+}
+.ground-segment::before { left: 0; }
+.ground-segment::after { right: 0; }
+
+/* The alley between two buildings. Depth does the warning work: the facing walls fall away into
+   black, and far below there is just enough sodium street glow to tell you how far down it is.
+   Falling in is fatal and no meow can clear it, so it has to read at a glance. */
 .pit {
     position: absolute;
     bottom: 0;
-    height: 40px; /* Flush with the ground segments either side, so the amber lips line up */
-    background: linear-gradient(#0a0714, #05030c);
-    border-left: 3px solid rgba(255, 159, 28, 0.85);
-    border-right: 3px solid rgba(255, 159, 28, 0.85);
+    height: 40px; /* Flush with the ground segments either side, so the walls line up with the decks */
+    background:
+        /* The two facing walls, in shadow, with a hint of window rows */
+        linear-gradient(90deg, rgba(120, 116, 108, 0.30) 0 2px, transparent 2px 100%),
+        linear-gradient(270deg, rgba(120, 116, 108, 0.30) 0 2px, transparent 2px 100%),
+        linear-gradient(90deg, rgba(255, 196, 92, 0.10) 0 5px, transparent 5px 14px),
+        linear-gradient(270deg, rgba(255, 196, 92, 0.08) 0 5px, transparent 5px 14px),
+        /* Sodium light on the street, a long way down */
+        radial-gradient(ellipse 60% 10px at 50% 100%, rgba(255, 160, 60, 0.22), transparent 70%),
+        linear-gradient(#0a0714 0%, #05030c 55%, #0b0710 100%);
     box-sizing: border-box;
-    box-shadow: inset 0 8px 14px rgba(0, 0, 0, 0.9);
+    box-shadow: inset 0 10px 16px rgba(0, 0, 0, 0.95);
 }
 #catContainer {
     position: absolute;
@@ -110,6 +153,18 @@ body {
 }
 .cat-launch { animation: catLaunch 0.16s ease-out; }
 .cat-land { animation: catLand 0.18s ease-out; }
+
+/* Climbing out of a vent pipe: he starts tucked inside the bore and small, then steps out onto
+   the deck. Applied to #catContainer rather than #cat, so it never has to re-state
+   scaleX(var(--face)) — facing lives on the container and is inherited down. transform-origin is
+   already bottom centre, so the growth reads as him standing up out of the pipe. */
+@keyframes catEmerge {
+    0% { transform: translateX(-17px) scale(0.5); opacity: 0.35; }
+    35% { transform: translateX(-11px) scale(0.72); opacity: 1; }
+    75% { transform: translateX(-2px) scale(1.02); opacity: 1; }
+    100% { transform: translateX(0) scale(1); opacity: 1; }
+}
+.cat-emerge { animation: catEmerge 0.42s ease-out; }
 
 /* Standing still: slow breathing with an occasional weight shift, because perfect
    stillness is the most mechanical thing a cat can do. One cycle covers three breaths
@@ -180,18 +235,105 @@ body {
     border-radius: 1px;
     box-sizing: border-box;
 }
-/* Drawn as a sawtooth via clip-path rather than "▲▲▲" text. The glyph left ~7px of empty
-   line-box beneath it, so a spike mounted on a platform appeared to hover above the slab.
-   With clip-path the valleys sit exactly on the element's bottom edge. Bright steel keeps
-   these readable as blades against the concrete pillars. */
+/* Roof installations. Each variant is a thin skin over the concrete base above — the plinth
+   stays, the machine sits on it, so the whole roof still shares one material family. game.js
+   adds the variant class from the map data, falling back to one picked by height, so no pillar
+   is ever left as an anonymous grey box. Detail goes in the *upper* part of the box: that is
+   what the eye reads, and it leaves the shared base grime untouched. */
+
+/* Condenser unit: louvred grille and side fins. The louvres are periodic, but they sit inside
+   a plainly machine-shaped box rather than running the full face, so it reads as equipment
+   instead of as the shelving the pillar rule warns about. */
+.obstacle.ac {
+    background:
+        repeating-linear-gradient(0deg, transparent 0 3px, rgba(0, 0, 0, 0.34) 3px 4px, transparent 4px 7px),
+        linear-gradient(90deg, rgba(0, 0, 0, 0.28) 0 3px, transparent 3px calc(100% - 3px), rgba(0, 0, 0, 0.28) calc(100% - 3px) 100%),
+        linear-gradient(#8e8b83 0%, #6f6d67 55%, #4f4d49 100%);
+    background-size: 100% 62%, 100% 62%, 100% 100%;
+    background-position: 0 0, 0 0, 0 0;
+    background-repeat: no-repeat, no-repeat, no-repeat;
+    border-top: 2px solid #a8a49b;
+}
+/* Turbine vent: the cowl on top actually turns, so something on every roof is alive. */
+.obstacle.fan::before {
+    content: '';
+    position: absolute;
+    left: 50%;
+    top: -13px;
+    width: 26px;
+    height: 26px;
+    margin-left: -13px;
+    border-radius: 50%;
+    background:
+        conic-gradient(from 0deg, #b9b5ab 0deg 24deg, #6d6a64 24deg 48deg, #b9b5ab 48deg 72deg,
+                       #6d6a64 72deg 96deg, #b9b5ab 96deg 120deg, #6d6a64 120deg 144deg,
+                       #b9b5ab 144deg 168deg, #6d6a64 168deg 192deg, #b9b5ab 192deg 216deg,
+                       #6d6a64 216deg 240deg, #b9b5ab 240deg 264deg, #6d6a64 264deg 288deg,
+                       #b9b5ab 288deg 312deg, #6d6a64 312deg 336deg, #b9b5ab 336deg 360deg);
+    box-shadow: inset 0 0 0 2px #56534e, 0 2px 4px rgba(0, 0, 0, 0.6);
+    animation: turbineSpin 4.5s linear infinite;
+}
+@keyframes turbineSpin {
+    from { transform: rotate(0deg); }
+    to { transform: rotate(360deg); }
+}
+/* Vent stack: a ribbed duct with a flared cap. For the tall ones. */
+.obstacle.stack {
+    background:
+        repeating-linear-gradient(0deg, rgba(255, 255, 255, 0.05) 0 1px, transparent 1px 6px, rgba(0, 0, 0, 0.20) 6px 8px, transparent 8px 13px),
+        linear-gradient(100deg, #7f7c75 0%, #6a6862 42%, #55534f 100%);
+    border-top: 3px solid #9d998f;
+}
+.obstacle.stack::before {
+    content: '';
+    position: absolute;
+    left: -4px;
+    right: -4px;
+    top: -6px;
+    height: 6px;
+    background: linear-gradient(#a6a29a 0 2px, #7d7a74 2px 100%);
+    border-radius: 2px 2px 0 0;
+    box-shadow: 0 2px 3px rgba(0, 0, 0, 0.5);
+}
+/* Water tank: banded steel drum, the classic rooftop silhouette. */
+.obstacle.tank {
+    background:
+        linear-gradient(0deg, transparent 0 14%, rgba(0, 0, 0, 0.32) 14% 16%, transparent 16% 46%, rgba(0, 0, 0, 0.32) 46% 48%, transparent 48% 78%, rgba(0, 0, 0, 0.32) 78% 80%, transparent 80%),
+        radial-gradient(ellipse 60% 40% at 26% 30%, rgba(255, 255, 255, 0.10), transparent 70%),
+        linear-gradient(100deg, #6e6a62 0%, #57534c 45%, #423f3a 100%);
+    border-radius: 3px 3px 1px 1px;
+    border-top: 2px solid #8d8880;
+}
+/* Roof hatch / skylight: warm light leaking out of the building, the one friendly thing up here. */
+.obstacle.hatch {
+    background:
+        linear-gradient(160deg, rgba(255, 196, 92, 0.30) 0 40%, transparent 40%),
+        linear-gradient(#5f5c56 0 4px, #4a4842 4px 100%);
+    border-top: 2px solid rgba(255, 196, 92, 0.55);
+    box-shadow: 0 -3px 10px rgba(255, 176, 70, 0.22);
+}
+/* Razor wire, the rooftop hazard that replaced the old steel sawtooth. There is no clip-path
+   here on purpose: the coil needs to be transparent *between* its loops, so the silhouette comes
+   from the ring gradient itself. The glow has to be a filter rather than a box-shadow for the
+   same reason as .snack — there is no solid box to hang a shadow on.
+   The 45px CSS box stays deliberately wider than the 30px collision width, so the wire always
+   looks like it touched Bumbot before it kills him. */
 .spike {
     position: absolute;
     bottom: 40px;
     width: 45px;
     height: 18px;
-    background: linear-gradient(#e4eaed 0%, #a7b0b5 45%, #666e73 100%);
-    clip-path: polygon(0% 100%, 16.7% 0%, 33.3% 100%, 50% 0%, 66.7% 100%, 83.3% 0%, 100% 100%);
-    filter: drop-shadow(0 1px 2px rgba(0, 0, 0, 0.6));
+    background:
+        /* Barbs: short bright ticks leaning off the coil */
+        repeating-linear-gradient(58deg, transparent 0 9px, rgba(226, 233, 237, 0.85) 9px 10px, transparent 10px 11px),
+        /* The loops themselves, one per 11px */
+        repeating-radial-gradient(circle 6.5px at 5.5px 8px, transparent 0 4.2px, #dfe6ea 4.2px 5.4px, rgba(150, 160, 166, 0.9) 5.4px 6.2px, transparent 6.2px),
+        /* The taut strand it is coiled around */
+        linear-gradient(rgba(200, 208, 213, 0.9) 0 1.5px, transparent 1.5px);
+    background-size: 100% 100%, 11px 100%, 100% 100%;
+    background-position: 0 0, 0 0, 0 15px;
+    background-repeat: no-repeat, repeat-x, no-repeat;
+    filter: drop-shadow(0 1px 2px rgba(0, 0, 0, 0.75));
     z-index: 11;
 }
 
@@ -258,6 +400,41 @@ body {
     box-sizing: border-box;
     box-shadow: inset 0 -4px 7px rgba(0, 0, 0, 0.28);
 }
+/* A catwalk needs to look held up, or it reads as a slab hanging in the sky. ::after is the
+   under-truss, ::before the two support legs; both fade downward instead of reaching the deck,
+   because only the 15px slab collides (and it blocks from below too) — solid-looking legs would
+   promise a wall that isn't there. */
+.platform::after {
+    content: '';
+    position: absolute;
+    left: 4px;
+    right: 4px;
+    top: 100%;
+    height: 12px;
+    background:
+        repeating-linear-gradient(58deg, rgba(150, 146, 138, 0.55) 0 1.5px, transparent 1.5px 13px),
+        repeating-linear-gradient(-58deg, rgba(150, 146, 138, 0.45) 0 1.5px, transparent 1.5px 13px),
+        linear-gradient(90deg, rgba(120, 117, 111, 0.5) 0 100%);
+    background-size: 100% 100%, 100% 100%, 100% 1.5px;
+    background-position: 0 0, 0 0, 0 bottom;
+    background-repeat: repeat, repeat, no-repeat;
+    -webkit-mask-image: linear-gradient(rgba(0, 0, 0, 0.9), transparent);
+    mask-image: linear-gradient(rgba(0, 0, 0, 0.9), transparent);
+    pointer-events: none;
+}
+.platform::before {
+    content: '';
+    position: absolute;
+    left: 12%;
+    right: 12%;
+    top: 100%;
+    height: 46px; /* Long enough to look founded on something; the mask hides where it ends */
+    background:
+        linear-gradient(90deg, rgba(138, 134, 126, 0.6) 0 3px, transparent 3px calc(100% - 3px), rgba(138, 134, 126, 0.6) calc(100% - 3px) 100%);
+    -webkit-mask-image: linear-gradient(rgba(0, 0, 0, 0.85), transparent 85%);
+    mask-image: linear-gradient(rgba(0, 0, 0, 0.85), transparent 85%);
+    pointer-events: none;
+}
 /* Invisible until landed on, then permanently revealed. The snack floating above one of
    these is the only hint that it exists. */
 .platform.hidden-platform {
@@ -282,6 +459,49 @@ body {
     border-radius: 2px;
     box-sizing: border-box;
     box-shadow: inset 0 -4px 7px rgba(0, 0, 0, 0.28), 0 0 10px rgba(217, 140, 38, 0.4);
+}
+/* The two movers get different machinery so their axis is readable before they move: a
+   horizontal one is a window-washing gondola slung from cables that run up off the top of the
+   screen, a vertical one is a hoist climbing a lattice mast. game.js adds the axis class. */
+.mover.mover-x::before {
+    content: '';
+    position: absolute;
+    left: 10%;
+    right: 10%;
+    bottom: 100%;
+    height: 320px;
+    background: linear-gradient(90deg, rgba(190, 186, 176, 0.45) 0 2px, transparent 2px calc(100% - 2px), rgba(190, 186, 176, 0.45) calc(100% - 2px) 100%);
+    pointer-events: none;
+}
+.mover.mover-x::after { /* Cradle rail along the outer edge of the gondola */
+    content: '';
+    position: absolute;
+    left: 0;
+    right: 0;
+    top: 100%;
+    height: 9px;
+    background:
+        linear-gradient(90deg, rgba(170, 166, 157, 0.55) 0 2px, transparent 2px calc(100% - 2px), rgba(170, 166, 157, 0.55) calc(100% - 2px) 100%),
+        linear-gradient(rgba(0, 0, 0, 0.25) 0 100%);
+    background-size: 100% 100%, 100% 2px;
+    background-position: 0 0, 0 bottom;
+    background-repeat: no-repeat;
+    pointer-events: none;
+}
+.mover.mover-y::after { /* Lattice mast, dropping away below the hoist */
+    content: '';
+    position: absolute;
+    left: 34%;
+    right: 34%;
+    top: 100%;
+    height: 150px;
+    background:
+        repeating-linear-gradient(62deg, rgba(160, 156, 147, 0.5) 0 1.5px, transparent 1.5px 12px),
+        repeating-linear-gradient(-62deg, rgba(160, 156, 147, 0.5) 0 1.5px, transparent 1.5px 12px),
+        linear-gradient(90deg, rgba(160, 156, 147, 0.55) 0 2px, transparent 2px calc(100% - 2px), rgba(160, 156, 147, 0.55) calc(100% - 2px) 100%);
+    -webkit-mask-image: linear-gradient(rgba(0, 0, 0, 0.9), transparent 90%);
+    mask-image: linear-gradient(rgba(0, 0, 0, 0.9), transparent 90%);
+    pointer-events: none;
 }
 /* A packaged cat treat stick, drawn rather than an emoji — Unicode has nothing stick-shaped
    that reads as cat food. clip-path gives the pinched candy-wrapper silhouette; the
@@ -440,31 +660,69 @@ body {
 .feeder.eaten .feeder-kibble {
     opacity: 0;
 }
-/* The mid-zone checkpoint. Dim and colourless until Bumbot walks past it, then it spins
-   up and glows, so its state is readable from a distance. */
-.portal-checkpoint {
+/* The vent pipe. Two things use it: the mid-zone checkpoint (dim and colourless until Bumbot
+   walks past, so its state reads from a distance) and the scenery pipe he climbs out of at the
+   start of a zone, which game.js marks .active from the first frame. Drawn entirely in CSS
+   rather than the old 🌀 glyph — a cat has to look like he could plausibly be inside it, and a
+   spinning character never did. The elbow faces right, the way he runs.
+   z-index keeps it *behind* Bumbot: stacked in front it would swallow him whenever he stood
+   here, and the emerge animation sells the exit on its own. */
+.vent-pipe {
     position: absolute;
     bottom: 40px;
-    width: 50px;
-    height: 70px;
-    font-size: 46px;
-    line-height: 70px;
-    text-align: center;
-    user-select: none;
-    opacity: 0.4;
-    filter: grayscale(1) brightness(0.7);
+    width: 46px;
+    height: 62px;
+    opacity: 0.45;
+    filter: grayscale(1) brightness(0.75);
     transition: opacity 0.4s ease-out, filter 0.4s ease-out;
     z-index: 5;
+    /* Riser: a ribbed duct standing on the deck, left of the mouth */
+    background:
+        repeating-linear-gradient(0deg, rgba(255, 255, 255, 0.06) 0 1px, transparent 1px 7px, rgba(0, 0, 0, 0.24) 7px 9px, transparent 9px 15px),
+        linear-gradient(100deg, #7c7972 0%, #66635e 44%, #4e4c48 100%);
+    background-size: 26px 100%, 26px 100%;
+    background-position: 0 0, 0 0;
+    background-repeat: no-repeat;
 }
-.portal-checkpoint.active {
+/* The elbow and its mouth: a dark bore he can come out of, with a lip catching the light */
+.vent-pipe::before {
+    content: '';
+    position: absolute;
+    left: 18px;
+    bottom: 0;
+    width: 28px;
+    height: 34px;
+    border-radius: 0 6px 4px 0;
+    background:
+        radial-gradient(ellipse 9px 13px at 100% 50%, #05040a 0 62%, rgba(10, 8, 16, 0.85) 62% 100%, transparent 100%),
+        linear-gradient(#8a877f 0 3px, #6d6a64 3px 9px, #55524d 9px 100%);
+    box-shadow: inset -2px 0 4px rgba(0, 0, 0, 0.55);
+}
+/* Bolted collar where the elbow meets the riser */
+.vent-pipe::after {
+    content: '';
+    position: absolute;
+    left: 14px;
+    bottom: 30px;
+    width: 20px;
+    height: 6px;
+    border-radius: 2px;
+    background: linear-gradient(#9a968d 0 2px, #706d67 2px 100%);
+    box-shadow: 0 1px 2px rgba(0, 0, 0, 0.5);
+}
+.vent-pipe.active {
     opacity: 1;
-    filter: drop-shadow(0 0 10px #00f0ff);
-    animation: portalSpin 3s linear infinite;
+    filter: none;
 }
-
-@keyframes portalSpin {
-    0% { transform: rotate(0deg); }
-    100% { transform: rotate(360deg); }
+/* Lit from inside, breathing slowly. A spin would look broken on a pipe, so the cue is the
+   glow in the bore instead. */
+.vent-pipe.active::before {
+    box-shadow: inset -2px 0 4px rgba(0, 0, 0, 0.55), inset -6px 0 12px rgba(0, 240, 255, 0.35);
+    animation: pipeBreathe 2.6s ease-in-out infinite;
+}
+@keyframes pipeBreathe {
+    0%, 100% { filter: drop-shadow(2px 0 6px rgba(0, 240, 255, 0.30)); }
+    50% { filter: drop-shadow(4px 0 12px rgba(0, 240, 255, 0.60)); }
 }
 #winScreen {
     display: none;
@@ -515,11 +773,17 @@ button:hover { background: #27ae60; }
    One tile alone repeats every screen or two and reads as wallpaper; overlapping 900/700/1100
    means the combined pattern only comes back around after tens of thousands of pixels.
    background-position anchors every band to the bottom, so differing tile heights give the
-   skyline its varied roofline. game.js overrides background-position-x only, keeping the Y. */
+   skyline its varied roofline. game.js overrides background-position-x only, keeping the Y.
+   The two layers say different things now that Bumbot runs along the rooftops: the far one is
+   the towers that still rise above him, the near one is the neighbouring roofs at his own eye
+   level. Keeping the near roofline low is what makes the drop into an alley read as forty
+   storeys rather than a step. */
 #farBuildings {
     position: absolute;
     bottom: 40px; left: 0; width: 100%; height: 200px;
     background:
+        /* Aerials and masts on their own prime-width tile, so they never line up with a tower */
+        linear-gradient(90deg, transparent 0 148px, #221856 148px 152px, transparent 152px 511px, #1d1449 511px 514px, transparent 514px 887px),
         /* Slender radio masts on the widest tile, so they punctuate rather than pattern */
         linear-gradient(90deg, transparent 0 96px, #1f1549 96px 106px, transparent 106px 470px, #1b1240 470px 478px, transparent 478px 900px),
         /* Mid-rise towers */
@@ -527,7 +791,7 @@ button:hover { background: #27ae60; }
         /* Squat blocks filling the gaps behind them */
         linear-gradient(90deg, transparent 0 30px, #130e2e 30px 140px, transparent 140px 250px, #150f35 250px 390px, transparent 390px 520px, #171038 520px 612px, transparent 612px 1100px);
     background-repeat: repeat-x;
-    background-size: 900px 190px, 700px 138px, 1100px 92px;
+    background-size: 887px 214px, 900px 190px, 700px 138px, 1100px 92px;
     background-position: 0 100%;
     opacity: 0.5;
     z-index: 2;
@@ -536,14 +800,20 @@ button:hover { background: #27ae60; }
     position: absolute;
     bottom: 40px; left: 0; width: 100%; height: 260px;
     background:
-        /* Foreground towers, tallest and most opaque */
+        /* Rooftop clutter on the neighbouring buildings — water tanks on legs, aerials, a lift
+           overrun — on a prime-width tile of its own so the junk never repeats with the roofs */
+        linear-gradient(90deg, transparent 0 58px, #100c28 58px 96px, transparent 96px 214px, #0d0924 214px 217px, transparent 217px 388px, #120e2c 388px 436px, transparent 436px 619px),
+        /* The roofs themselves, at about Bumbot's own level */
         linear-gradient(90deg, #0e0a22 0 90px, transparent 90px 210px, #0a071b 210px 330px, transparent 330px 486px, #100c26 486px 552px, transparent 552px 820px),
         /* A second row on a much wider tile to break up the rhythm of the first */
         linear-gradient(90deg, transparent 0 62px, #0b081c 62px 200px, transparent 200px 344px, #110d29 344px 470px, transparent 470px 640px, #0d0a20 640px 762px, transparent 762px 1300px),
-        /* Low rooftops and utility sheds hugging the ground line */
-        linear-gradient(90deg, transparent 0 24px, #0c0920 24px 128px, transparent 128px 300px, #0f0b25 300px 372px, transparent 372px 540px);
+        /* Parapets and utility sheds hugging the roofline */
+        linear-gradient(90deg, transparent 0 24px, #0c0920 24px 128px, transparent 128px 300px, #0f0b25 300px 372px, transparent 372px 540px),
+        /* Night haze filling the air between the near roofs and the far towers, so the gap
+           between the two rooflines reads as distance instead of as empty sky */
+        linear-gradient(transparent 0%, rgba(104, 78, 168, 0.16) 62%, rgba(126, 96, 190, 0.22) 100%);
     background-repeat: repeat-x;
-    background-size: 820px 232px, 1300px 154px, 540px 74px;
+    background-size: 619px 138px, 820px 104px, 1300px 66px, 540px 38px, 100% 150px;
     background-position: 0 100%;
     opacity: 0.85;
     z-index: 3;
@@ -630,6 +900,34 @@ button:hover { background: #27ae60; }
     user-select: none;
     z-index: 12;
     filter: drop-shadow(1px 0px 0px #ff3333) drop-shadow(-1px 0px 0px #ff3333) drop-shadow(0px 1px 0px #ff3333) drop-shadow(0px -1px 0px #ff3333);
+}
+/* Pigeons that patrol the roof deck on foot rather than circling. Just as lethal as the flyers,
+   but lit like Bumbot rather than outlined like them: flattened to a silhouette, then edge-lit
+   warm on one side and cool on the other by the same city that lights him. The flyers' hard red
+   outline traced the glyph's pale head brightly and let its darker body sink into the deck, so a
+   walker read as a head hopping along on its own — and as a traced sticker rather than a bird.
+   A crow on the deck is a live animal in the same light he is; the threat reads from it walking
+   at you, not from a warning colour.
+   --wing carries the facing because these keyframes own `transform`, exactly as --face does for
+   Bumbot, and --paw-drop seats the glyph's feet on the deck for the same reason. */
+.pigeon.walker {
+    filter:
+        /* brightness(0) flattens the glyph to one silhouette; invert then lifts that flat black
+           to a uniform slate grey. It has to be done in this order — once brightness has crushed
+           it to black there is no detail left to blow out, so the grey stays a clean shape. */
+        brightness(0) invert(0.42)
+        drop-shadow(-1px -1px 0px rgba(255, 194, 128, 0.9))
+        drop-shadow(1px 1px 0px rgba(126, 170, 235, 0.6))
+        drop-shadow(0px 0px 5px rgba(0, 0, 0, 0.85));
+    animation: pigeonStrut 0.9s ease-in-out infinite;
+}
+@keyframes pigeonStrut {
+    0% { transform: translateY(var(--paw-drop)) scaleX(var(--wing, 1)) rotate(0deg); }
+    25% { transform: translateY(calc(var(--paw-drop) - 1px)) scaleX(var(--wing, 1)) rotate(-3deg); }
+    50% { transform: translateY(var(--paw-drop)) scaleX(var(--wing, 1)) rotate(0deg); }
+    70% { transform: translateY(calc(var(--paw-drop) + 3px)) scaleX(var(--wing, 1)) rotate(7deg); } /* the peck */
+    85% { transform: translateY(calc(var(--paw-drop) + 1px)) scaleX(var(--wing, 1)) rotate(2deg); }
+    100% { transform: translateY(var(--paw-drop)) scaleX(var(--wing, 1)) rotate(0deg); }
 }
 .cracked {
     position: absolute;
