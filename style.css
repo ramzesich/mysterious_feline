@@ -1,9 +1,10 @@
-/* The cat emoji's ink stops short of the bottom of its line box (descender space the glyph
-   never draws into), so the sprite floated a few px above whatever he was standing on.
-   Everything that draws him — #cat and the catnip after-images — shifts down by this much so
-   his paws sit on the surface his 40+catY container bottom is actually resting on. */
+/* The bird emoji's ink stops short of the bottom of its line box (descender space the glyph
+   never draws into), so a walking crow floated a few px above the deck. Anything drawn from a
+   bird glyph shifts down by this much to put its feet on the surface its 40+y bottom is really
+   resting on. Bumbot no longer needs it — he is an SVG sprite whose paws are authored on the
+   bottom edge of his box — so this is bird-only, hence the name. */
 :root {
-    --paw-drop: 5px;
+    --bird-drop: 5px;
 }
 body {
     margin: 0;
@@ -123,22 +124,26 @@ body {
 #cat {
     width: 100%;
     height: 100%;
-    font-size: 45px;
-    line-height: 42px; /* Tight line height overrides text box centering and lowers the emoji */
-    text-align: center;
     user-select: none;
-    transform: translateY(var(--paw-drop)) scaleX(var(--face, -1)); /* --face is set on #catContainer and inherits down */
-    display: block; /* Forces clean geometric drawing bounds rather than character spacing */
-    /* A black Bombay cat lit by the city rather than a white-outlined sprite: warm street
-       light catches one edge, cool bounce light the other, and the soft dark spread keeps
+    transform: scaleX(var(--face, -1)); /* --face is set on #catContainer and inherits down */
+    display: block;
+    /* A black Bombay cat lit by the city: the sprite's own near-black fills give him form, warm
+       street light catches one edge, cool bounce light the other, and the soft dark spread keeps
        him separated from the buildings behind. The offsets look inverted because scaleX
        mirrors the filter output too — as written, the warm edge lands top-RIGHT when he
-       faces right, matching #skyBg's glow in that corner. */
+       faces right, matching #skyBg's glow in that corner.
+       No brightness(0) here, unlike the birds: that only existed to flatten an emoji, and it
+       would crush the sprite's per-part shading to a single black shape. */
     filter:
-        brightness(0)
         drop-shadow(-1px -1px 0px rgba(255, 194, 128, 0.9))
         drop-shadow(1px 1px 0px rgba(126, 170, 235, 0.6))
         drop-shadow(0px 0px 5px rgba(0, 0, 0, 0.85));
+}
+#cat svg {
+    display: block;
+    width: 100%;
+    height: 100%; /* Font metrics no longer establish the box, so the sprite has to be told */
+    overflow: visible; /* Legs swinging through a run cycle can reach past the viewBox */
 }
 /* Deliberately gentle: a real cat compresses on landing, it does not stretch like rubber. */
 @keyframes catLaunch {
@@ -182,6 +187,68 @@ body {
     96%, 100% { transform: scale(1, 1) rotate(0deg); }
 }
 .cat-idle { animation: catIdle 6.2s ease-in-out infinite; }
+
+/* --- The rig. Everything below animates *parts* of the sprite, never #cat itself: .munching
+   owns #cat's own transform and would clobber anything declared there.
+
+   transform-box: fill-box is mandatory on every animated part. Without it an SVG transform
+   pivots on the viewBox origin, so a leg swings from the corner of the box instead of from its
+   hip — that is the first thing to check if the gait ever looks unhinged. --- */
+#bbTail, #bbEar, #bbJaw,
+#bbLegFrontNear, #bbLegFrontFar, #bbLegBackNear, #bbLegBackFar {
+    transform-box: fill-box;
+}
+/* Legs pivot at the hip, which is the top edge of each leg group's own box */
+#bbLegFrontNear, #bbLegFrontFar, #bbLegBackNear, #bbLegBackFar {
+    transform-origin: 50% 0%;
+}
+#bbTail { transform-origin: 0% 100%; } /* Base of the tail, where it meets the haunch */
+#bbEar { transform-origin: 50% 100%; }
+#bbJaw { transform-origin: 100% 0%; }  /* Hinges at the back, like a jaw */
+
+/* A four-beat gait: diagonal pairs travel together, which is what stops a four-legged walk
+   reading as a pantomime horse. The pairs are (front-near, back-far) and (front-far, back-near),
+   offset by exactly half the cycle via a negative delay so it starts mid-stride. */
+@keyframes bbStride {
+    0% { transform: rotate(15deg); }
+    50% { transform: rotate(-15deg); }
+    100% { transform: rotate(15deg); }
+}
+.cat-run #bbLegFrontNear,
+.cat-run #bbLegBackFar { animation: bbStride 0.34s linear infinite; }
+.cat-run #bbLegFrontFar,
+.cat-run #bbLegBackNear { animation: bbStride 0.34s linear infinite -0.17s; }
+
+/* Airborne: front legs reach forward, back legs tuck. A held pose, not a loop — positive
+   rotation swings a paw toward -x, which is forward while he is authored facing left. */
+.cat-air #bbLegFrontNear,
+.cat-air #bbLegFrontFar { transform: rotate(17deg); }
+.cat-air #bbLegBackNear,
+.cat-air #bbLegBackFar { transform: rotate(-21deg); }
+
+/* The tail is never still — that is most of what sells him as alive rather than a cut-out.
+   It swings harder and faster while he is running. */
+@keyframes bbTailSway {
+    0% { transform: rotate(-5deg); }
+    100% { transform: rotate(7deg); }
+}
+#bbTail { animation: bbTailSway 2.4s ease-in-out infinite alternate; }
+.cat-run #bbTail { animation-duration: 0.62s; }
+
+/* An ear flick on a long cycle, so standing still never looks like a paused frame */
+@keyframes bbEarTwitch {
+    0%, 86%, 100% { transform: rotate(0deg); }
+    89% { transform: rotate(-11deg); }
+    93% { transform: rotate(4deg); }
+}
+#bbEar { animation: bbEarTwitch 5.4s ease-in-out infinite; }
+
+/* Chewing: the jaw works in time with the body dip, so the 0.45s matches .munching exactly */
+@keyframes bbChew {
+    0%, 100% { transform: rotate(0deg); }
+    50% { transform: rotate(13deg); }
+}
+.munching #bbJaw { animation: bbChew 0.45s ease-in-out infinite; }
 #meowBubble {
     position: absolute;
     background: white;
@@ -337,49 +404,54 @@ body {
     z-index: 11;
 }
 
-/* Flinch shake for taking a hit. Every keyframe has to re-state scaleX(var(--face)) or the
-   animation would clobber which way Bumbot faces. */
-@keyframes bumbotFlinch {
-    0% { transform: translate(1px, 1px) scaleX(var(--face, -1)); }
-    10% { transform: translate(-1px, -2px) scaleX(var(--face, -1)); }
-    20% { transform: translate(-3px, 0px) scaleX(var(--face, -1)); }
-    30% { transform: translate(0px, 2px) scaleX(var(--face, -1)); }
-    40% { transform: translate(1px, -1px) scaleX(var(--face, -1)); }
-    50% { transform: translate(-1px, 2px) scaleX(var(--face, -1)); }
-    60% { transform: translate(-3px, 1px) scaleX(var(--face, -1)); }
-    70% { transform: translate(2px, 1px) scaleX(var(--face, -1)); }
-    80% { transform: translate(-1px, -1px) scaleX(var(--face, -1)); }
-    90% { transform: translate(2px, 2px) scaleX(var(--face, -1)); }
-    100% { transform: translate(1px, -2px) scaleX(var(--face, -1)); }
-}
-.hurt {
-    animation: bumbotFlinch 0.15s infinite;
-    filter: invert(1) sepia(1) saturate(5) hue-rotate(300deg) !important; /* Flashes red to read as a hit */
-}
+/* Dying, in two flavours. Neither one flashes the screen or shakes him any more: getting hit is
+   read entirely off Bumbot himself, which is the point of having a rigged sprite.
 
-/* Head-dip chewing loop for the victory sequence. Like bumbotFlinch, every keyframe has to
-   re-state scaleX(var(--face)) or the animation would clobber which way Bumbot faces. */
+   Caught by wire or a bird: every hair goes up, then he bails — a startled hop straight up and
+   then off the bottom of the screen. #gameWindow clips at its edges, so travelling far enough
+   down is all "off screen" needs to mean. */
+@keyframes catBail {
+    0% { transform: translateY(0) scale(1, 1); }
+    16% { transform: translateY(-14px) scale(0.93, 1.09); } /* the startled leap */
+    32% { transform: translateY(-9px) scale(1, 1); }
+    100% { transform: translateY(300px) scale(1.03, 0.97); }
+}
+.cat-bail { animation: catBail 0.56s cubic-bezier(0.3, 0, 0.9, 1) forwards; }
+
+/* Falling into an alley: no hop and no fright, because he is already on his way down. This just
+   carries him the rest of the way out of sight. */
+@keyframes catPlunge {
+    0% { transform: translateY(0); }
+    100% { transform: translateY(300px); }
+}
+.cat-plunge { animation: catPlunge 0.48s cubic-bezier(0.35, 0, 1, 1) forwards; }
+
+/* The fright itself: spikes revealed along his back, a bottlebrush tail straight up, ears pinned
+   outward, and all four legs splayed the way they are mid-jump — he is caught in the act of
+   launching himself away. The ambient tail sway and ear twitch have to be switched off or they
+   fight the pose, and so does the stride, in case he was mid-run when it happened. */
+#bbFur { opacity: 0; }
+.cat-spooked #bbFur { opacity: 1; }
+.cat-spooked #bbTail { animation: none; transform: rotate(-31deg); } /* negative swings it upright */
+.cat-spooked #bbTail path { stroke-width: 5.8; }
+.cat-spooked #bbEar { animation: none; transform: rotate(-15deg); }
+.cat-spooked #bbLegFrontNear,
+.cat-spooked #bbLegFrontFar { animation: none; transform: rotate(20deg); }
+.cat-spooked #bbLegBackNear,
+.cat-spooked #bbLegBackFar { animation: none; transform: rotate(-24deg); }
+
+/* Head-dip chewing loop for the victory sequence. Every keyframe has to re-state
+   scaleX(var(--face)) or the animation would clobber which way Bumbot faces. */
 @keyframes bumbotMunch {
-    0% { transform: translateY(var(--paw-drop)) rotate(0deg) scaleX(var(--face, -1)); }
-    20% { transform: translateY(calc(var(--paw-drop) + 4px)) rotate(-6deg) scaleX(var(--face, -1)); }
-    40% { transform: translateY(calc(var(--paw-drop) + 1px)) rotate(-2deg) scaleX(var(--face, -1)); }
-    60% { transform: translateY(calc(var(--paw-drop) + 4px)) rotate(-5deg) scaleX(var(--face, -1)); }
-    80% { transform: translateY(calc(var(--paw-drop) + 1px)) rotate(-1deg) scaleX(var(--face, -1)); }
-    100% { transform: translateY(var(--paw-drop)) rotate(0deg) scaleX(var(--face, -1)); }
+    0% { transform: translateY(0px) rotate(0deg) scaleX(var(--face, -1)); }
+    20% { transform: translateY(4px) rotate(-6deg) scaleX(var(--face, -1)); }
+    40% { transform: translateY(1px) rotate(-2deg) scaleX(var(--face, -1)); }
+    60% { transform: translateY(4px) rotate(-5deg) scaleX(var(--face, -1)); }
+    80% { transform: translateY(1px) rotate(-1deg) scaleX(var(--face, -1)); }
+    100% { transform: translateY(0px) rotate(0deg) scaleX(var(--face, -1)); }
 }
 .munching {
     animation: bumbotMunch 0.45s ease-in-out infinite;
-}
-
-#damageFlash {
-    position: absolute;
-    top: 0; left: 0; width: 100%; height: 100%;
-    background: rgba(192, 41, 43, 0.4);
-    border: 4px solid #c0392b;
-    box-sizing: border-box;
-    display: none;
-    z-index: 45;
-    pointer-events: none;
 }
 
 /* Precast concrete slabs. Same material as the pillars, kept distinct three ways: vertical
@@ -840,22 +912,21 @@ button:hover { background: #27ae60; }
     opacity: 0.85;
     text-shadow: 1px 1px black;
 }
-/* Bumbot's outline turns catnip-green while the rush is available */
+/* Bumbot's outline turns catnip-green while the rush is available. No brightness(0): his own
+   shading stays, the green just wraps it. */
 #cat.catnip {
     filter:
-        brightness(0)
         drop-shadow(1px 0px 0px #8ef2a4) drop-shadow(-1px 0px 0px #8ef2a4)
         drop-shadow(0px 1px 0px #8ef2a4) drop-shadow(0px -1px 0px #8ef2a4)
         drop-shadow(0 0 7px rgba(142, 242, 164, 0.9));
 }
-/* Motion trail spawned every third frame while sprinting */
+/* Motion trail spawned every third frame while sprinting. This one *keeps* brightness(0): each
+   ghost is a clone of the sprite, and a trail should read as a flat green-edged shape rather
+   than a stack of fully drawn cats. */
 .after-image {
     position: absolute;
     width: 50px;
     height: 42px;
-    font-size: 45px;
-    line-height: 42px;
-    text-align: center;
     pointer-events: none;
     user-select: none;
     z-index: 9;
@@ -864,6 +935,11 @@ button:hover { background: #27ae60; }
         drop-shadow(1px 0px 0px #8ef2a4) drop-shadow(-1px 0px 0px #8ef2a4)
         drop-shadow(0px 1px 0px #8ef2a4) drop-shadow(0px -1px 0px #8ef2a4);
     animation: afterImageFade 0.36s ease-out forwards;
+}
+.after-image svg {
+    display: block;
+    width: 100%;
+    height: 100%;
 }
 
 @keyframes afterImageFade {
@@ -909,7 +985,7 @@ button:hover { background: #27ae60; }
    A crow on the deck is a live animal in the same light he is; the threat reads from it walking
    at you, not from a warning colour.
    --wing carries the facing because these keyframes own `transform`, exactly as --face does for
-   Bumbot, and --paw-drop seats the glyph's feet on the deck for the same reason. */
+   Bumbot, and --bird-drop seats the glyph's feet on the deck for the same reason. */
 .pigeon.walker {
     filter:
         /* brightness(0) flattens the glyph to one silhouette; invert then lifts that flat black
@@ -922,12 +998,12 @@ button:hover { background: #27ae60; }
     animation: pigeonStrut 0.9s ease-in-out infinite;
 }
 @keyframes pigeonStrut {
-    0% { transform: translateY(var(--paw-drop)) scaleX(var(--wing, 1)) rotate(0deg); }
-    25% { transform: translateY(calc(var(--paw-drop) - 1px)) scaleX(var(--wing, 1)) rotate(-3deg); }
-    50% { transform: translateY(var(--paw-drop)) scaleX(var(--wing, 1)) rotate(0deg); }
-    70% { transform: translateY(calc(var(--paw-drop) + 3px)) scaleX(var(--wing, 1)) rotate(7deg); } /* the peck */
-    85% { transform: translateY(calc(var(--paw-drop) + 1px)) scaleX(var(--wing, 1)) rotate(2deg); }
-    100% { transform: translateY(var(--paw-drop)) scaleX(var(--wing, 1)) rotate(0deg); }
+    0% { transform: translateY(var(--bird-drop)) scaleX(var(--wing, 1)) rotate(0deg); }
+    25% { transform: translateY(calc(var(--bird-drop) - 1px)) scaleX(var(--wing, 1)) rotate(-3deg); }
+    50% { transform: translateY(var(--bird-drop)) scaleX(var(--wing, 1)) rotate(0deg); }
+    70% { transform: translateY(calc(var(--bird-drop) + 3px)) scaleX(var(--wing, 1)) rotate(7deg); } /* the peck */
+    85% { transform: translateY(calc(var(--bird-drop) + 1px)) scaleX(var(--wing, 1)) rotate(2deg); }
+    100% { transform: translateY(var(--bird-drop)) scaleX(var(--wing, 1)) rotate(0deg); }
 }
 .cracked {
     position: absolute;

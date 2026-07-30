@@ -17,7 +17,7 @@ No build, no dependencies, no tests, no lint. Open `index.html` in a browser
 don't add `import`/`export` without also changing the script tags.
 
 Verify changes by actually playing: climb out of the spawn pipe, move right, jump onto a
-catwalk, touch razor wire (death flash + respawn out of a pipe), fall into an alley, ride a
+catwalk, touch razor wire (fur up, bail off screen, respawn out of a pipe), fall into an alley, ride a
 gondola, walk into a strutting pigeon, pass the checkpoint pipe then die (should respawn there),
 press `M` (ripple + installations shatter), reach the feeder and watch the munch sequence before
 the win screen.
@@ -26,7 +26,7 @@ the win screen.
 
 | File | Role |
 |---|---|
-| `index.html` | DOM skeleton: parallax layers, UI, `#world`, cat, win screen. Static elements only. |
+| `index.html` | DOM skeleton: parallax layers, UI, `#world`, Bumbot's SVG sprite, win screen. Static elements only. |
 | `map.js` | `ZONES` — all level data, plus a header comment stating the design budget. |
 | `game.js` | Everything else: input, physics, collision, particles, camera, audio. |
 | `style.css` | All visuals, hitbox-relevant sizes, and keyframe animations. |
@@ -67,13 +67,54 @@ each other — change one and re-check the other:
 
 - `.ground-segment` and `.pit` are 40px tall with `box-sizing: border-box`. The segment's 4px
   `border-top` would otherwise paint the walkable surface at 44px while physics stands at 40.
-- The 🐈‍⬛ glyph leaves unpainted descender space under his paws, so `--paw-drop` (`:root`,
-  5px) shifts every drawing of him down: `#cat`'s transform, the `bumbotMunch` keyframes
-  (which override that transform, hence the `calc()`s), and the dash after-images in
-  `spawnAfterImage()`. Walking pigeons reuse it in `pigeonStrut` for the same reason.
+- The 🐦‍⬛ crow glyph leaves unpainted descender space under its feet, so `--bird-drop` (`:root`,
+  5px) shifts it down in `pigeonStrut`. It is **bird-only** — Bumbot is an SVG sprite whose paws
+  are authored on the bottom edge of his box, so he needs no compensation. (The variable used to
+  be `--paw-drop` and applied to him too.)
 - Pigeons follow the `40 + y` convention like everything else. They used to be written as
   `bottom = pig.y` while collision compared `pig.y` against ground-relative `catY`, so every
   flyer rendered 40px below its own hitbox.
+
+## Bumbot's sprite
+
+Bumbot is **not** an emoji — he is an inline SVG in `index.html` inside `#cat`, on a
+`viewBox="0 0 50 42"`, authored **facing left** (as the old glyph was, so `--face: -1` still
+means "mirrored to face right"). Fills are presentation attributes on the shapes, near-black with
+a slightly lighter chest and haunch; the far-side legs are darkest so they read as behind. The
+birds are still emoji on purpose — they get converted once his shape has proven itself.
+
+Three layers of animation, and mixing them up is the easy mistake:
+
+| Layer | Element | Examples |
+|---|---|---|
+| Whole-body squash/emerge | `#catContainer` | `catLaunch`, `catLand`, `catIdle`, `catEmerge` |
+| Whole-body chew | `#cat` — **owns its `transform`** | `bumbotMunch` |
+| Dying | `#catContainer` | `catBail`, `catPlunge` |
+| Parts | `<g>`s inside the svg | `bbStride`, `bbTailSway`, `bbEarTwitch`, `bbChew` |
+
+Because `.munching` overwrites `#cat`'s transform wholesale, **part animation must
+live on descendants, never on `#cat`.**
+
+Rig notes:
+
+- Every animated part sets **`transform-box: fill-box`**. Without it an SVG transform pivots on
+  the viewBox origin, so a leg swings from the corner of the box — that is the first thing to
+  check if the gait ever looks unhinged.
+- Legs pivot at the hip (`transform-origin: 50% 0%`), the tail at its base, the jaw at its back.
+- The gait is a four-beat: diagonal pairs (front-near + back-far) share a cycle, the other pair
+  runs the same animation with a `-0.17s` delay — half of 0.34s — so it starts mid-stride.
+- `game.js` toggles `cat-run` and `cat-air` on `#cat` from `isGrounded` and the arrow keys, in
+  `update()` next to the idle-settling block. Both are cleared in `loadZone()`,
+  `startVictoryMunch()` and `triggerHurtReset()`, because those three stop the loop — leave them
+  on and he chews or dies with his legs still striding.
+- `spawnAfterImage()` clones the live sprite and strips the clone's `id`s: they would duplicate
+  the original's, and a motion trail wants a frozen snapshot.
+- Only the birds keep `brightness(0)` in their filter stacks. On Bumbot it would crush his
+  per-part shading to one black shape; the dash ghosts keep it deliberately, because a trail
+  should read flat.
+- `sprite-lab.html` is a scratch harness for authoring: it links the real `style.css` and shows a
+  sprite at 1×/2×/4× standing on a real ground segment and at an alley edge. `qlmanage -t -s 600
+  -o <dir> <file>.svg` rasterizes an SVG so it can be examined without a browser.
 
 ## Entity model
 
@@ -157,10 +198,12 @@ in the air, `'y'` hovers up and down, and `'walk'` struts along a surface (`y: 0
 deck, a slab height puts one on a catwalk). All three are equally lethal on contact and all
 three die to a meow or a catnip dash, so a walker needs no new collision code.
 
-Walkers are crows (`🐦‍⬛`) lit like Bumbot rather than outlined like the flyers — flattened by
-`brightness(0)`, lifted to slate grey by `invert()` (that order matters: brightness first crushes
-the glyph to one flat shape, so nothing blows out), then warm/cool edge-lit. The flyers' hard red
-outline made a pale-headed bird glyph read as a detached head hopping along the deck. They keep
+Walkers are crows (`🐦‍⬛`) wearing the same warm/cool rim light as Bumbot rather than the flyers'
+outline — flattened by `brightness(0)`, lifted to slate grey by `invert()` (that order matters:
+brightness first crushes the glyph to one flat shape, so nothing blows out), then edge-lit. They
+still need the flattening because they are glyphs; Bumbot does not, because he is a sprite. The
+flyers' hard red outline made a pale-headed bird glyph read as a detached head hopping along the
+deck. They keep
 no warning colour: a walker's threat reads from the fact that it walks at you. `pigeonStrut` owns
 their `transform`, so their facing travels as `--wing` for the keyframes to re-state — the same
 trick `--face` plays for Bumbot, and it mirrors the rim light with him too. Placement rules live
@@ -196,11 +239,23 @@ unreachable, and it invalidates `map.js`'s design budget.
 `update()` early-returns when `gameActive === false`, which **terminates the loop
 entirely** — whoever cleared the flag must restart it with `requestAnimationFrame(update)`
 *and* reset `lastFrameTime = 0`, so the pause isn't billed as one enormous frame. Existing
-restart sites: `triggerHurtReset()` (after 600ms) and `loadZone()`.
+restart sites: `triggerHurtReset()` (after the death animation, 520-800ms depending on cause) and
+`loadZone()`.
 
 Two reset paths, deliberately different:
-- `triggerHurtReset()` (death) — returns to `respawnX` (the checkpoint pipe if passed, else the
-  zone's spawn), keeping score and level state.
+- `triggerHurtReset(cause)` (death) — returns to `respawnX` (the checkpoint pipe if passed, else
+  the zone's spawn), keeping score and level state. It has **two presentations**, and neither
+  flashes the screen or shakes him — the read is entirely on the sprite, which is the payoff of
+  rigging him:
+  - contact with wire or a bird: `.cat-spooked` on `#cat` reveals `bbFur` (spikes along his back),
+    puffs the tail and pins the ears, then 200ms later `.cat-bail` on the container hops him up
+    and drops him off the bottom of the screen. 800ms total.
+  - `cause === 'pit'`: no fright and no hop, because he is already falling — `.cat-plunge` just
+    carries him the rest of the way down. 520ms total.
+
+  Both are clipped by `#gameWindow`'s `overflow: hidden`, which is all "off screen" needs to mean.
+  The respawn hand-draws `left`/`bottom` before `playPipeEmerge()`, because the loop is still
+  stopped and he would otherwise play one frame of climbing out of a pipe wherever he died.
 - `loadZone(i)` — full reload: geometry, score back to 1, `respawnX` back to spawn, level
   regenerated, victory-munch classes cleared. `handleWinButton()` and `resetGame()` both route
   through it, and `handleWinButton` is called from an inline `onclick` in `index.html`, so it

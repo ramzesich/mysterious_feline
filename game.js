@@ -154,10 +154,15 @@ function handleCatnipKeys(e) {
 function spawnAfterImage() {
     const ghost = document.createElement('div');
     ghost.classList.add('after-image');
-    ghost.innerText = '🐈‍⬛';
+    // A clone of the live sprite, so the trail can never drift out of sync with how he is drawn.
+    // Its ids are stripped: they would be duplicates of the live sprite's, and a motion trail
+    // wants a frozen snapshot rather than parts that carry on animating behind him.
+    const ghostSprite = cat.firstElementChild.cloneNode(true);
+    ghostSprite.querySelectorAll('[id]').forEach(node => node.removeAttribute('id'));
+    ghost.appendChild(ghostSprite);
     ghost.style.left = catX + 'px';
     ghost.style.bottom = (40 + catY) + 'px';
-    ghost.style.transform = 'translateY(var(--paw-drop)) scaleX(' + (-faceDirection) + ')';
+    ghost.style.transform = 'scaleX(' + (-faceDirection) + ')';
     world.appendChild(ghost);
     setTimeout(() => ghost.remove(), 360);
 }
@@ -599,6 +604,9 @@ function startVictoryMunch() {
     catContainer.style.setProperty('--face', -1); // Face the feeder
     catContainer.classList.remove('cat-idle', 'cat-launch', 'cat-land');
     cat.classList.add('munching');
+    // update() has stopped, so nothing will clear the gait classes for us — and a cat whose legs
+    // are still striding while he eats looks broken.
+    cat.classList.remove('cat-run', 'cat-air');
 
     // Kibble disappears partway through, so the bowl ends up visibly emptied
     setTimeout(() => goalFeeder.classList.add('eaten'), 950);
@@ -623,7 +631,11 @@ function startVictoryMunch() {
     }, munchDuration);
 }
 
-function triggerHurtReset() {
+// Two ways to die, and they look different. cause 'pit' is a fall into an alley, where he is
+// already dropping and just keeps going; anything else is contact with wire or a bird, where his
+// fur stands up and he bails off the bottom of the screen in fright. Neither flashes the screen —
+// the whole read is on the sprite.
+function triggerHurtReset(cause) {
     if (!gameActive) return;
 
     // God mode shrugs the hit off. Falling still has to be handled, or Bumbot would drop
@@ -641,22 +653,38 @@ function triggerHurtReset() {
 
     // Step 1: Lock player controls and physics instantly
     gameActive = false;
+    cat.classList.remove('cat-run', 'cat-air'); // The loop has stopped; don't freeze him mid-stride
 
-    // Step 2: A pained descending yowl
-    playAudioTone(520, 'sawtooth', 0.18);
-    setTimeout(() => playAudioTone(340, 'sawtooth', 0.18), 90);
-    setTimeout(() => playAudioTone(190, 'square', 0.24), 180);
+    const fellInAlley = cause === 'pit';
 
-    // Step 3: Flash the screen red and make Bumbot flinch
-    const flashElement = document.getElementById('damageFlash');
-    flashElement.style.display = 'block';
-    cat.classList.add('hurt');
+    // Step 2: The sound of it. A pained yowl for a hit; for a fall, the same yowl dropping away
+    // further and slower, as though it is going down the alley with him.
+    if (fellInAlley) {
+        playAudioTone(430, 'sawtooth', 0.22);
+        setTimeout(() => playAudioTone(250, 'sawtooth', 0.26), 120);
+        setTimeout(() => playAudioTone(120, 'sine', 0.34), 260);
+    } else {
+        playAudioTone(520, 'sawtooth', 0.18);
+        setTimeout(() => playAudioTone(340, 'sawtooth', 0.18), 90);
+        setTimeout(() => playAudioTone(190, 'square', 0.24), 180);
+    }
 
-    // Step 4: Hold the frozen failure scene visible for 600 milliseconds before resetting
+    // Step 3: Fur up, then bail — or, in an alley, simply carry on down out of sight
+    let hold;
+    if (fellInAlley) {
+        catContainer.classList.add('cat-plunge');
+        hold = 520;
+    } else {
+        cat.classList.add('cat-spooked');
+        setTimeout(() => catContainer.classList.add('cat-bail'), 200);
+        hold = 800;
+    }
+
+    // Step 4: Hold the failure scene until he is off screen, then bring him back out of a pipe
     setTimeout(() => {
         // Clear layout modifiers cleanly
-        flashElement.style.display = 'none';
-        cat.classList.remove('hurt');
+        cat.classList.remove('cat-spooked');
+        catContainer.classList.remove('cat-bail', 'cat-plunge');
 
         // Back to the cat feeder if one has been passed, otherwise the zone's spawn
         catX = respawnX;
@@ -666,13 +694,17 @@ function triggerHurtReset() {
         groundedOn = null;
         wasInAirBefore = false;
         catContainer.style.setProperty('--face', -1); // Out of the pipe facing the way he runs
+        // Draw the new position by hand before the emerge starts: the loop is still stopped, and
+        // without this he would play one frame of climbing out of a pipe wherever he died.
+        catContainer.style.left = catX + 'px';
+        catContainer.style.bottom = '40px';
         playPipeEmerge();
 
         // Re-engage main updating runtime loops loop
         gameActive = true;
-        lastFrameTime = 0; // Discard the 600ms pause so it is not treated as one huge frame
+        lastFrameTime = 0; // Discard the death pause so it is not treated as one huge frame
         requestAnimationFrame(update);
-    }, 600);
+    }, hold);
 }
 
 let activeDust = [];
@@ -785,7 +817,7 @@ function stepPhysics(dt) {
             if (isOverSolidGround(catX) || dashing) {
                 catY = 0; velocityY = 0; isGrounded = true; groundedOn = null;
             } else if (catY < fallDeathY) {
-                triggerHurtReset(); // Fell into a pit
+                triggerHurtReset('pit'); // Fell into an alley: no fright, he just keeps going down
                 return;
             }
         }
@@ -911,6 +943,12 @@ function update(timestamp) {
         catContainer.classList.remove('cat-idle');
     }
 
+    // Gait. These drive the sprite's legs and tail, so they go on #cat rather than the
+    // container — the container's transform belongs to the squash and emerge animations.
+    const striding = isGrounded && (keys.ArrowLeft || keys.ArrowRight);
+    cat.classList.toggle('cat-run', striding);
+    cat.classList.toggle('cat-air', !isGrounded);
+
     // Catnip extras: a motion trail while sprinting, plus the diagnostics readout
     if (catnipMode) {
         ghostFrame++;
@@ -949,7 +987,7 @@ function loadZone(index) {
     winScreen.style.display = 'none';
 
     // Clear everything the victory sequence and idle settling left on him
-    cat.classList.remove('munching');
+    cat.classList.remove('munching', 'cat-run', 'cat-air');
     catContainer.classList.remove('cat-idle', 'cat-launch', 'cat-land', 'cat-emerge');
     catContainer.style.setProperty('--face', -1);
     idleFrames = 0;
