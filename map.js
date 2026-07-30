@@ -1,5 +1,5 @@
 // Level data. Each zone is self-contained: its own length, spawn, ground gaps, objects
-// and pigeons. game.js reads ZONES[zoneIndex], so adding a second zone here is all that
+// and birds. game.js reads ZONES[zoneIndex], so adding a second zone here is all that
 // is needed for it to become playable — the win screen will offer it as the next zone.
 //
 // Zone 1 runs along the rooftops, and the ground data says so: every pit is the alley between
@@ -14,7 +14,7 @@
 //   * Installations (pillar type) stay <= 125. Above ~130 there is not enough time above the
 //     top to clear a 40px-wide box, which would silently make a Sonic Meow mandatory.
 //   * Hazards stay ~120px clear of an alley edge, so clearing one never throws Bumbot in.
-//   * Walking pigeons are as lethal as the flying ones. Their min/max must stay inside one
+//   * Pigeons on foot are as lethal as the crows in the air. Their min/max must stay inside one
 //     roof, speed <= 2 so an approaching bird can be jumped, and none of them patrols the
 //     landing side of a gap.
 //   * The whole zone is completable without spending a single snack. Meows are a
@@ -144,9 +144,11 @@ const ZONES = [
             { type: 'pillar', x: 15550, width: 40, height: 40, variant: 'hatch' }
         ],
 
-        // axis 'x' patrols horizontally in the air; axis 'y' hovers up and down; axis 'walk'
-        // struts along a surface at `y` (0 is the roof deck) and is just as lethal as the rest.
-        pigeons: [
+        // The zone's wildlife. `axis` picks both the behaviour and the species, because up here
+        // they are the same thing: 'walk' is a pigeon strutting a surface at `y` (0 is the roof
+        // deck), while 'x' and 'y' are crows working the air — patrolling across, or hovering up
+        // and down. All three are equally lethal on contact.
+        birds: [
             { x: 800, y: 0, axis: 'walk', min: 700, max: 1000, speed: 1.4 },   // Roof 1's resident
             { x: 1200, y: 150, axis: 'x', min: 1000, max: 1400, speed: 2 },
             { x: 2560, y: 180, axis: 'x', min: 2450, max: 2800, speed: 2.2 },

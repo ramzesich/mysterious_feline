@@ -3,7 +3,7 @@
 A zone-based side-scrolling platformer. Play as Bumbot — a live black Bombay cat, **not** a
 robot, despite what the old `triggerShortCircuitReset`/battery naming used to imply — running
 across the **rooftops** of a cyberpunk city to the cat feeder waiting at the far end, dodging
-razor wire, the alleys between buildings, and pigeons both airborne and on foot; collecting
+razor wire, the alleys between buildings, and birds both airborne and on foot; collecting
 snacks, and using the Sonic Meow to clear obstacles. Zone 1 (`neon-outskirts`) is 16000px of
 thirteen rooftops, with a checkpoint vent pipe at its midpoint. Keep copy, comments and new
 mechanics feline rather than mechanical, and keep new scenery *rooftop* — if a thing wouldn't
@@ -18,7 +18,7 @@ don't add `import`/`export` without also changing the script tags.
 
 Verify changes by actually playing: climb out of the spawn pipe, move right, jump onto a
 catwalk, touch razor wire (fur up, bail off screen, respawn out of a pipe), fall into an alley, ride a
-gondola, walk into a strutting pigeon, pass the checkpoint pipe then die (should respawn there),
+gondola, walk into a strutting pigeon, get hit by a crow, pass the checkpoint pipe then die (should respawn there),
 press `M` (ripple + installations shatter), reach the feeder and watch the munch sequence before
 the win screen.
 
@@ -34,7 +34,7 @@ the win screen.
 ## Zones
 
 `map.js` exports `ZONES`, an array of self-contained zone objects: `id`, `name`,
-`worldWidth`, `spawnX`, `pits`, `objects`, `pigeons`. `game.js` holds `zoneIndex` / `zone`
+`worldWidth`, `spawnX`, `pits`, `objects`, `birds`. `game.js` holds `zoneIndex` / `zone`
 and everything derives from that, so **adding a zone to the array is all that's needed** for
 it to be playable — the win screen automatically offers "Enter Next Zone" when a next zone
 exists, via `handleWinButton()`.
@@ -67,11 +67,12 @@ each other — change one and re-check the other:
 
 - `.ground-segment` and `.pit` are 40px tall with `box-sizing: border-box`. The segment's 4px
   `border-top` would otherwise paint the walkable surface at 44px while physics stands at 40.
-- The 🐦‍⬛ crow glyph leaves unpainted descender space under its feet, so `--bird-drop` (`:root`,
-  5px) shifts it down in `pigeonStrut`. It is **bird-only** — Bumbot is an SVG sprite whose paws
-  are authored on the bottom edge of his box, so he needs no compensation. (The variable used to
-  be `--paw-drop` and applied to him too.)
-- Pigeons follow the `40 + y` convention like everything else. They used to be written as
+- Descender compensation is gone entirely. It existed because an emoji's ink stops short of the
+  bottom of its line box; Bumbot and the pigeons are now sprites whose feet are authored on the
+  bottom edge of their boxes. (It was `--paw-drop`, then bird-only as `--bird-drop`, now deleted
+  along with the `pigeonStrut` keyframes it fed. Crows never used it — the flying glyph is not
+  standing on anything.)
+- Birds follow the `40 + y` convention like everything else. They used to be written as
   `bottom = pig.y` while collision compared `pig.y` against ground-relative `catY`, so every
   flyer rendered 40px below its own hitbox.
 
@@ -119,7 +120,7 @@ Rig notes:
 ## Entity model
 
 `generateLevel()` turns each `zone.objects` entry into a DOM div plus a `RuntimeEntities`
-record (`{...obj, dom, active}`); `zone.pigeons` become `PigeonEntities`.
+record (`{...obj, dom, active}`); `zone.birds` become `BirdEntities`.
 
 - `pillar` — solid box from y=0 to `height`. Rendered as a roof installation: an optional
   `variant` (`hatch` / `ac` / `fan` / `tank` / `stack`) becomes a second CSS class, and
@@ -153,7 +154,7 @@ which is why level clearing keys on `.level-entity` instead of type classes.
 `isSolidType()` / `isSlabType()` decide collision behavior — extend those rather than adding
 type checks inline. Removal pattern: set `active = false`, animate, then `setTimeout(remove)`.
 
-Every generated node (objects, pigeons, ground segments, pit voids) gets `.level-entity`, and
+Every generated node (objects, birds, ground segments, pit voids) gets `.level-entity`, and
 `generateLevel()` clears exactly that. Add the class to anything new you generate.
 
 **Gotcha:** collision uses the *data* dimensions while rendering uses CSS ones, and they
@@ -191,24 +192,47 @@ Consequences worth knowing: the ground clamp at `catY <= 0` is now conditional, 
 frame. A pit is the one hazard a meow cannot remove — that's deliberate, and it's what keeps
 the no-snack route honest.
 
-## Pigeons
+## Birds
 
-`zone.pigeons` entries carry `{x, y, axis, min, max, speed}`. `axis: 'x'` patrols horizontally
-in the air, `'y'` hovers up and down, and `'walk'` struts along a surface (`y: 0` is the roof
-deck, a slab height puts one on a catwalk). All three are equally lethal on contact and all
-three die to a meow or a catnip dash, so a walker needs no new collision code.
+`zone.birds` entries carry `{x, y, axis, min, max, speed}`, and **`axis` picks the species as well
+as the behaviour**, because on a rooftop they are the same thing:
 
-Walkers are crows (`🐦‍⬛`) wearing the same warm/cool rim light as Bumbot rather than the flyers'
-outline — flattened by `brightness(0)`, lifted to slate grey by `invert()` (that order matters:
-brightness first crushes the glyph to one flat shape, so nothing blows out), then edge-lit. They
-still need the flattening because they are glyphs; Bumbot does not, because he is a sprite. The
-flyers' hard red outline made a pale-headed bird glyph read as a detached head hopping along the
-deck. They keep
-no warning colour: a walker's threat reads from the fact that it walks at you. `pigeonStrut` owns
-their `transform`, so their facing travels as `--wing` for the keyframes to re-state — the same
-trick `--face` plays for Bumbot, and it mirrors the rim light with him too. Placement rules live
-in `map.js`'s header: patrol range inside one roof, speed ≤ 2, never on the landing side of an
-alley.
+| `axis` | Species | Behaviour |
+|---|---|---|
+| `walk` | pigeon (`🐦`) | struts a surface at `y` — 0 is the roof deck, a slab height puts one on a catwalk |
+| `x` | crow (`🐦‍⬛`) | patrols horizontally through the air between `min` and `max` |
+| `y` | crow (`🐦‍⬛`) | hovers up and down |
+
+All three are equally lethal on contact and all three die to a meow or a catnip dash, so no
+species needs its own collision code. `generateLevel()` adds `.bird` plus `.pigeon` or `.crow`;
+the stylesheet keys both the artwork and the lighting off the species class.
+
+**Pigeons are drawn sprites; crows are still the glyph.** A pigeon is a clone of the
+`<template id="pigeonSprite">` at the bottom of `index.html` — a template rather than a live node
+because there are many of them, and its parts carry **classes** (`.pig-head`, `.pig-leg-front`, …)
+rather than ids for the same reason. Real pigeon greys with a warm beak and feet and a visible
+eye, wearing only Bumbot's rim light: the `brightness(0) invert()` flattening that a glyph needed
+is gone, because authored geometry has no pale-headed artwork to fight.
+
+Facing is a plain `transform: scaleX(var(--wing))` on the box now, *not* something keyframes must
+re-state, because the strut lives on the parts. The rig follows Bumbot's rules — `transform-box:
+fill-box` on everything animated, joint-shaped origins (tail base, shoulder, neck base, throat,
+hips). Neck and head are **nested** so two motions can run at once: the neck carries the 0.88s
+walking bob, the head a 4.6s peck. One element cannot animate `transform` twice.
+
+Everything is keyed off a 0.44s step so the body rise, the leg swap and the tail flick land
+together, with the head nodding once per pair of steps.
+
+Crows keep the hard red outline: they are read at a distance, usually against the sky, and red is
+the game's warning colour. A red outline on a bird standing on the deck traced its pale head
+brightly and let the body sink into the roof, so it read as a detached head hopping along — a
+pigeon's threat instead reads from the fact that it walks at you.
+
+The pigeon sprite's ink spans roughly `y+3` to `y+33` against a hitbox of `y+8`..`y+32`, so its
+legs stick out below the lethal band. That is deliberate and forgiving; the hitbox was not touched.
+
+Placement rules live in `map.js`'s header: a walker's patrol range stays inside one roof, speed
+≤ 2, and never on the landing side of an alley.
 
 ## Movers and carrying
 
@@ -294,7 +318,7 @@ If you change camera math, change both.
 ## Sonic Meow
 
 `M` key. Costs one snack (`snacks`, which doubles as ammo; starts at 1). Destroys every
-pillar, spike, and pigeon currently on screen, spawning rubble bursts. Pits and movers are
+pillar, spike, and bird currently on screen, spawning rubble bursts. Pits and movers are
 immune. Zero snacks plays a low reject tone instead.
 
 ## Catnip (hidden dev mode)
@@ -307,8 +331,8 @@ a `🌿 CATNIP` tag shows, so you can never mistake cheat mode for normal play.
 
 The dash (`isDashing()` — catnip mode plus `Shift`) is 4× speed and nothing stops him:
 horizontal and airborne solid collision are both skipped so he runs through platforms and
-movers, pits are treated as whole ground, and pillars, spikes and pigeons are destroyed on
-contact via the shared `shatterEntity()` / `vaporizePigeon()` helpers. The checkpoint portal,
+movers, pits are treated as whole ground, and pillars, spikes and birds are destroyed on
+contact via the shared `shatterEntity()` / `vaporizeBird()` helpers. The checkpoint portal,
 snacks and the win line are all overlap-only, so they keep working normally at dash speed —
 every hitbox window is at least 63px against a 28px-per-slice step, so nothing gets skipped.
 

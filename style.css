@@ -1,11 +1,3 @@
-/* The bird emoji's ink stops short of the bottom of its line box (descender space the glyph
-   never draws into), so a walking crow floated a few px above the deck. Anything drawn from a
-   bird glyph shifts down by this much to put its feet on the surface its 40+y bottom is really
-   resting on. Bumbot no longer needs it — he is an SVG sprite whose paws are authored on the
-   bottom edge of his box — so this is bird-only, hence the name. */
-:root {
-    --bird-drop: 5px;
-}
 body {
     margin: 0;
     background: #111;
@@ -966,7 +958,10 @@ button:hover { background: #27ae60; }
     pointer-events: none;
     z-index: 25;
 }
-.pigeon {
+/* Both kinds of bird share one box; the species class decides how it is lit. Species and
+   behaviour are the same thing up here: a pigeon walks the deck, a crow works the air, and both
+   are equally lethal on contact. */
+.bird {
     position: absolute;
     width: 40px;
     height: 40px;
@@ -975,36 +970,82 @@ button:hover { background: #27ae60; }
     text-align: center;
     user-select: none;
     z-index: 12;
-    filter: drop-shadow(1px 0px 0px #ff3333) drop-shadow(-1px 0px 0px #ff3333) drop-shadow(0px 1px 0px #ff3333) drop-shadow(0px -1px 0px #ff3333);
 }
-/* Pigeons that patrol the roof deck on foot rather than circling. Just as lethal as the flyers,
-   but lit like Bumbot rather than outlined like them: flattened to a silhouette, then edge-lit
-   warm on one side and cool on the other by the same city that lights him. The flyers' hard red
-   outline traced the glyph's pale head brightly and let its darker body sink into the deck, so a
-   walker read as a head hopping along on its own — and as a traced sticker rather than a bird.
-   A crow on the deck is a live animal in the same light he is; the threat reads from it walking
-   at you, not from a warning colour.
-   --wing carries the facing because these keyframes own `transform`, exactly as --face does for
-   Bumbot, and --bird-drop seats the glyph's feet on the deck for the same reason. */
-.pigeon.walker {
+/* Crows in the air keep the hard red outline. They are the hazard you have to read at a distance,
+   often against the sky rather than against a roof, and red is the game's warning colour. */
+.bird.crow {
     filter:
-        /* brightness(0) flattens the glyph to one silhouette; invert then lifts that flat black
-           to a uniform slate grey. It has to be done in this order — once brightness has crushed
-           it to black there is no detail left to blow out, so the grey stays a clean shape. */
-        brightness(0) invert(0.42)
-        drop-shadow(-1px -1px 0px rgba(255, 194, 128, 0.9))
-        drop-shadow(1px 1px 0px rgba(126, 170, 235, 0.6))
-        drop-shadow(0px 0px 5px rgba(0, 0, 0, 0.85));
-    animation: pigeonStrut 0.9s ease-in-out infinite;
+        drop-shadow(1px 0px 0px #ff3333) drop-shadow(-1px 0px 0px #ff3333)
+        drop-shadow(0px 1px 0px #ff3333) drop-shadow(0px -1px 0px #ff3333);
 }
-@keyframes pigeonStrut {
-    0% { transform: translateY(var(--bird-drop)) scaleX(var(--wing, 1)) rotate(0deg); }
-    25% { transform: translateY(calc(var(--bird-drop) - 1px)) scaleX(var(--wing, 1)) rotate(-3deg); }
-    50% { transform: translateY(var(--bird-drop)) scaleX(var(--wing, 1)) rotate(0deg); }
-    70% { transform: translateY(calc(var(--bird-drop) + 3px)) scaleX(var(--wing, 1)) rotate(7deg); } /* the peck */
-    85% { transform: translateY(calc(var(--bird-drop) + 1px)) scaleX(var(--wing, 1)) rotate(2deg); }
-    100% { transform: translateY(var(--bird-drop)) scaleX(var(--wing, 1)) rotate(0deg); }
+/* Pigeons on the deck are drawn, not typed: an SVG clone of #pigeonSprite with real pigeon greys.
+   No flattening filter — that only existed because a glyph's pale head sank its darker body into
+   the roof, and geometry we author has no such problem. Only Bumbot's rim light stays, so the
+   birds and the cat are lit by the same city. Facing is a plain transform here rather than
+   something the keyframes must re-state, because the strut lives on the *parts* now. */
+.bird.pigeon {
+    transform: scaleX(var(--wing, 1));
+    filter:
+        drop-shadow(-1px -1px 0px rgba(255, 194, 128, 0.75))
+        drop-shadow(1px 1px 0px rgba(126, 170, 235, 0.5))
+        drop-shadow(0px 0px 4px rgba(0, 0, 0, 0.8));
 }
+.bird.pigeon svg {
+    display: block;
+    width: 100%;
+    height: 100%;
+    overflow: visible; /* The peck dips the head below the viewBox */
+}
+/* The rig. Same rules as Bumbot's: fill-box or every part pivots on the viewBox corner, and each
+   part gets the origin of the joint it actually turns on. */
+.pig-all, .pig-tail, .pig-wing, .pig-neck, .pig-head, .pig-leg {
+    transform-box: fill-box;
+}
+.pig-tail { transform-origin: 0% 50%; }   /* where it meets the body */
+.pig-wing { transform-origin: 20% 40%; }  /* shoulder */
+.pig-neck { transform-origin: 50% 100%; } /* base of the neck */
+.pig-head { transform-origin: 90% 90%; }  /* the throat, so a peck swings the beak down */
+.pig-leg  { transform-origin: 50% 0%; }   /* hip */
+
+/* A two-beat strut. Everything is keyed off the same 0.44s step so the body rise, the leg swap
+   and the tail flick land together; the head bob runs at double that, one nod per pair of steps,
+   which is what makes a pigeon look like a pigeon rather than a wind-up toy. */
+@keyframes pigBodyBob {
+    0%, 100% { transform: translateY(0); }
+    50% { transform: translateY(-0.9px); }
+}
+@keyframes pigStep {
+    0% { transform: rotate(11deg); }
+    50% { transform: rotate(-11deg); }
+    100% { transform: rotate(11deg); }
+}
+@keyframes pigTailFlick {
+    0%, 100% { transform: rotate(-5deg); }
+    50% { transform: rotate(3deg); }
+}
+@keyframes pigHeadBob {
+    0%, 100% { transform: translateX(0) rotate(0deg); }
+    30% { transform: translateX(-1.4px) rotate(-4deg); }
+    65% { transform: translateX(0.6px) rotate(3deg); }
+}
+/* The peck is rare on purpose: on a short loop it reads as a nervous tic. */
+@keyframes pigPeck {
+    0%, 62%, 100% { transform: translate(0, 0) rotate(0deg); }
+    70% { transform: translate(-1.4px, 6.4px) rotate(20deg); }
+    78% { transform: translate(-1.2px, 5.4px) rotate(17deg); }
+    88% { transform: translate(0, 1px) rotate(3deg); }
+}
+@keyframes pigWingShuffle {
+    0%, 92%, 100% { transform: rotate(0deg); }
+    95% { transform: rotate(-7deg); }
+}
+.bird.pigeon .pig-all { animation: pigBodyBob 0.44s ease-in-out infinite; }
+.bird.pigeon .pig-leg-front { animation: pigStep 0.88s linear infinite; }
+.bird.pigeon .pig-leg-back { animation: pigStep 0.88s linear infinite -0.44s; }
+.bird.pigeon .pig-tail { animation: pigTailFlick 0.88s ease-in-out infinite; }
+.bird.pigeon .pig-neck { animation: pigHeadBob 0.88s ease-in-out infinite; }
+.bird.pigeon .pig-head { animation: pigPeck 4.6s ease-in-out infinite; }
+.bird.pigeon .pig-wing { animation: pigWingShuffle 3.7s ease-in-out infinite; }
 .cracked {
     position: absolute;
     width: 100%;

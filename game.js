@@ -11,6 +11,7 @@ const farBuildings = document.getElementById('farBuildings');
 const nearBuildings = document.getElementById('nearBuildings');
 const devPanel = document.getElementById('devPanel');
 const telemetry = document.getElementById('telemetry');
+const pigeonSprite = document.getElementById('pigeonSprite'); // <template>, cloned per walking bird
 
 const windowWidth = 700;
 
@@ -200,7 +201,7 @@ window.addEventListener('keyup', (e) => {
 });
 
 let RuntimeEntities = [];
-let PigeonEntities = [];
+let BirdEntities = [];
 
 // Only these types take part in solid collision. Spikes, snacks and the checkpoint portal
 // are overlap-only, so they are handled in handleOverlapSystems instead.
@@ -272,7 +273,7 @@ function generateLevel() {
     // which shares the .feeder class with nothing else in the world.
     document.querySelectorAll('.level-entity').forEach(el => el.remove());
     RuntimeEntities = [];
-    PigeonEntities = [];
+    BirdEntities = [];
 
     // Sync our top dashboard display panel instantly on load
     energyDisplay.innerText = "Snacks: " + snacks;
@@ -330,21 +331,27 @@ function generateLevel() {
         RuntimeEntities.push(entity);
     });
 
-    zone.pigeons.forEach((pig) => {
+    zone.birds.forEach((pig) => {
         const element = document.createElement('div');
-        const walker = pig.axis === 'walk'; // Struts the deck instead of patrolling the air
-        element.classList.add('pigeon', 'level-entity');
-        if (walker) element.classList.add('walker');
-        // A crow on foot rather than a pigeon: the dark body takes the red outline as a rim
-        // light, where the pale-headed bird glyph wore it as a halo.
-        element.innerText = walker ? '🐦‍⬛' : '🕊️';
+        // Species and behaviour are one and the same up here: pigeons are the ones strutting the
+        // deck on foot, crows are the ones working the air. The class carries the species so the
+        // stylesheet can light each one its own way.
+        const walker = pig.axis === 'walk';
+        element.classList.add('bird', walker ? 'pigeon' : 'crow', 'level-entity');
+        if (walker) {
+            // A drawn sprite, cloned per bird from the template at the bottom of index.html.
+            // Its parts carry classes rather than ids, so any number of them can coexist.
+            element.appendChild(pigeonSprite.content.cloneNode(true));
+        } else {
+            element.innerText = '🐦‍⬛'; // Crows are still a glyph — they are next
+        }
         element.style.left = pig.x + 'px';
         // Same ground-relative convention as every other entity, and the same one the collision
-        // check below already assumed — pigeons used to render 40px below their own hitbox.
+        // check below already assumed — birds used to render 40px below their own hitbox.
         element.style.bottom = (40 + pig.y) + 'px';
         world.appendChild(element);
 
-        PigeonEntities.push({
+        BirdEntities.push({
             dom: element, x: pig.x, y: pig.y,
             axis: pig.axis || 'x',
             min: pig.min, max: pig.max,
@@ -402,7 +409,7 @@ function shatterEntity(ent) {
     playAudioTone(120, 'sawtooth', 0.2);
 }
 
-function vaporizePigeon(pig) {
+function vaporizeBird(pig) {
     if (!pig.active) return;
     pig.active = false; // Stops the patrol clamp from resurrecting it
 
@@ -414,7 +421,7 @@ function vaporizePigeon(pig) {
 }
 
 // The catnip dash: Shift held in catnip mode. Nothing stops him — pillars and spikes
-// shatter, pigeons vaporize, pits are crossed as if the ground were whole.
+// shatter, birds vaporize, pits are crossed as if the ground were whole.
 function isDashing() {
     return catnipMode && overclocking;
 }
@@ -464,9 +471,9 @@ function triggerSonicMeow() {
         if (ent.x >= viewLeftBound - 40 && ent.x <= viewRightBound) shatterEntity(ent);
     });
 
-    // Also blast away visible pigeons
-    PigeonEntities.forEach(pig => {
-        if (pig.active && pig.x >= viewLeftBound && pig.x <= viewRightBound) vaporizePigeon(pig);
+    // Also blast away visible birds
+    BirdEntities.forEach(pig => {
+        if (pig.active && pig.x >= viewLeftBound && pig.x <= viewRightBound) vaporizeBird(pig);
     });
 }
 
@@ -526,11 +533,11 @@ function handleOverlapSystems() {
 
     const dashing = isDashing();
 
-    PigeonEntities.forEach(pig => {
+    BirdEntities.forEach(pig => {
         if (!pig.active) return;
         // The glyph floats inside a 40px box, so the hitbox is inset to match the bird
         if (catX < pig.x + 34 && catX + catWidth > pig.x + 6 && catY < pig.y + 32 && catY + catHeight > pig.y + 8) {
-            if (dashing) vaporizePigeon(pig);
+            if (dashing) vaporizeBird(pig);
             else triggerHurtReset();
         }
     });
@@ -846,8 +853,8 @@ function stepPhysics(dt) {
         playAudioTone(250, 'sine', 0.04); // Deep quiet thump landing frequency note bleep
     }
 
-    // 3. Update the pigeons — the drones circling overhead and the ones strutting the deck
-    PigeonEntities.forEach(pig => {
+    // 3. Update the birds — the crows working the air and the pigeons strutting the deck
+    BirdEntities.forEach(pig => {
         if (!pig.active) return;
         const travel = pig.speed * pig.dir * dt;
 
@@ -858,7 +865,7 @@ function stepPhysics(dt) {
             pig.dom.style.bottom = (40 + pig.y) + 'px';
         } else {
             // Both 'x' (hovering patrol) and 'walk' (strutting the roof) travel horizontally;
-            // a walker's y never changes, so it is only written once, at spawn.
+            // a pigeon's y never changes, so it is only written once, at spawn.
             pig.x += travel;
             if (pig.x >= pig.max) { pig.x = pig.max; pig.dir = -1; }
             else if (pig.x <= pig.min) { pig.x = pig.min; pig.dir = 1; }
