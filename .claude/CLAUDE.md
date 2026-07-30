@@ -199,18 +199,18 @@ as the behaviour**, because on a rooftop they are the same thing:
 
 | `axis` | Species | Behaviour |
 |---|---|---|
-| `walk` | pigeon (`🐦`) | struts a surface at `y` — 0 is the roof deck, a slab height puts one on a catwalk |
-| `x` | crow (`🐦‍⬛`) | patrols horizontally through the air between `min` and `max` |
-| `y` | crow (`🐦‍⬛`) | hovers up and down |
+| `walk` | pigeon | struts a surface at `y` — 0 is the roof deck, a slab height puts one on a catwalk |
+| `x` | crow | patrols horizontally through the air between `min` and `max` |
+| `y` | crow | hovers up and down |
 
 All three are equally lethal on contact and all three die to a meow or a catnip dash, so no
 species needs its own collision code. `generateLevel()` adds `.bird` plus `.pigeon` or `.crow`;
 the stylesheet keys both the artwork and the lighting off the species class.
 
-**Pigeons are drawn sprites; crows are still the glyph.** A pigeon is a clone of the
-`<template id="pigeonSprite">` at the bottom of `index.html` — a template rather than a live node
-because there are many of them, and its parts carry **classes** (`.pig-head`, `.pig-leg-front`, …)
-rather than ids for the same reason. Real pigeon greys with a warm beak and feet and a visible
+**Nothing here is an emoji any more.** Each bird is a clone of a `<template>` at the bottom of
+`index.html` — `#pigeonSprite` or `#crowSprite` — a template rather than a live node because there
+are many of them, and their parts carry **classes** (`.pig-head`, `.crw-wing-near`, …) rather than
+ids for the same reason. Real pigeon greys with a warm beak and feet and a visible
 eye, wearing only Bumbot's rim light: the `brightness(0) invert()` flattening that a glyph needed
 is gone, because authored geometry has no pale-headed artwork to fight.
 
@@ -223,10 +223,17 @@ walking bob, the head a 4.6s peck. One element cannot animate `transform` twice.
 Everything is keyed off a 0.44s step so the body rise, the leg swap and the tail flick land
 together, with the head nodding once per pair of steps.
 
-Crows keep the hard red outline: they are read at a distance, usually against the sky, and red is
-the game's warning colour. A red outline on a bird standing on the deck traced its pale head
-brightly and let the body sink into the roof, so it read as a detached head hopping along — a
-pigeon's threat instead reads from the fact that it walks at you.
+Crows have lost the hard red outline they wore as a glyph: a drawn bird with beating wings is
+legible without a warning colour, so they carry the same city rim light as everything else alive up
+here, with a deep brown eye. Both species' threat now reads from behaviour — a pigeon walks at you,
+a crow flies at you.
+
+The crow's flap beats both wings together (alternating them reads as a wounded bird), with the far
+wing on a shallower arc and a darker fill so the two never merge into one shape, and the body
+rising on the downstroke to sell the effort. **The downstroke is deliberately shallower than the
+upstroke:** past about 25° the wing swings in behind the body and, everything being near-black, the
+bird reads as briefly wingless. That was visible in the first cut and is the thing to re-check if
+the wing geometry is ever changed.
 
 The pigeon sprite's ink spans roughly `y+3` to `y+33` against a hitbox of `y+8`..`y+32`, so its
 legs stick out below the lethal band. That is deliberate and forgiving; the hitbox was not touched.

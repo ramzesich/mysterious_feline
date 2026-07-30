@@ -971,13 +971,66 @@ button:hover { background: #27ae60; }
     user-select: none;
     z-index: 12;
 }
-/* Crows in the air keep the hard red outline. They are the hazard you have to read at a distance,
-   often against the sky rather than against a roof, and red is the game's warning colour. */
+/* Crows in the air. They used to wear a hard red outline as a warning colour, which a glyph
+   needed to be legible at all; a drawn bird with its own wings does not. Now they carry the same
+   city rim light as Bumbot and the pigeons — the threat reads from the flight path, not the paint.
+   No transform here: game.js writes facing straight onto this element for the patrolling ones, so
+   the flap has to live on the wings. */
 .bird.crow {
     filter:
-        drop-shadow(1px 0px 0px #ff3333) drop-shadow(-1px 0px 0px #ff3333)
-        drop-shadow(0px 1px 0px #ff3333) drop-shadow(0px -1px 0px #ff3333);
+        drop-shadow(-1px -1px 0px rgba(255, 194, 128, 0.7))
+        drop-shadow(1px 1px 0px rgba(126, 170, 235, 0.5))
+        drop-shadow(0px 0px 4px rgba(0, 0, 0, 0.85));
 }
+.bird.crow svg {
+    display: block;
+    width: 100%;
+    height: 100%;
+    overflow: visible; /* Wings reach well past the viewBox at both ends of the stroke */
+    /* A crow is a bigger bird than a pigeon, so it is drawn larger than its 40px box. The scale
+       lives here rather than in the geometry because .crw-all's transform belongs to the flap's
+       body lift, and rather than in the box size because left/bottom are written from the data.
+       Consequence worth knowing: the hitbox (x+6..x+34, y+8..y+32) does not grow with it, so his
+       wingtips reach outside the lethal band. That errs towards forgiving, which is the same way
+       every other margin in this game leans. */
+    transform: scale(1.22);
+    transform-origin: 50% 55%;
+}
+.crw-all, .crw-wing-far, .crw-wing-near, .crw-head, .crw-tail {
+    transform-box: fill-box;
+}
+/* Both origins are the shoulder at (17.5,20) expressed against each wing's own box: the near wing
+   spans y 10..22.6, the far one 13..22.6, so the same point is a different percentage in each. */
+.crw-wing-near { transform-origin: 0% 79%; }
+.crw-wing-far { transform-origin: 0% 73%; }
+.crw-head { transform-origin: 100% 50%; }
+.crw-tail { transform-origin: 0% 50%; }
+
+/* The flap. Both wings beat together — alternating them would read as a wounded bird — with the
+   far one running a shallower arc so the two never overlap into one shape. The body rises on the
+   downstroke, which is the bit that makes it look like the wings are doing work.
+   The downstroke is deliberately shallower than the up: past about 25deg the wing swings in behind
+   the body and, everything here being near-black, the bird reads as briefly wingless. */
+@keyframes crowFlapNear {
+    0%, 100% { transform: rotate(-38deg); }
+    50% { transform: rotate(21deg); }
+}
+@keyframes crowFlapFar {
+    0%, 100% { transform: rotate(-31deg); }
+    50% { transform: rotate(15deg); }
+}
+@keyframes crowLift {
+    0%, 100% { transform: translateY(-1.2px); }
+    50% { transform: translateY(1.2px); }
+}
+@keyframes crowTailSteer {
+    0%, 100% { transform: rotate(2deg); }
+    50% { transform: rotate(-3deg); }
+}
+.bird.crow .crw-wing-near { animation: crowFlapNear 0.42s ease-in-out infinite; }
+.bird.crow .crw-wing-far { animation: crowFlapFar 0.42s ease-in-out infinite; }
+.bird.crow .crw-all { animation: crowLift 0.42s ease-in-out infinite; }
+.bird.crow .crw-tail { animation: crowTailSteer 0.84s ease-in-out infinite; }
 /* Pigeons on the deck are drawn, not typed: an SVG clone of #pigeonSprite with real pigeon greys.
    No flattening filter — that only existed because a glyph's pale head sank its darker body into
    the roof, and geometry we author has no such problem. Only Bumbot's rim light stays, so the

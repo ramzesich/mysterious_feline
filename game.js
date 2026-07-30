@@ -12,6 +12,7 @@ const nearBuildings = document.getElementById('nearBuildings');
 const devPanel = document.getElementById('devPanel');
 const telemetry = document.getElementById('telemetry');
 const pigeonSprite = document.getElementById('pigeonSprite'); // <template>, cloned per walking bird
+const crowSprite = document.getElementById('crowSprite');     // <template>, cloned per flying bird
 
 const windowWidth = 700;
 
@@ -338,13 +339,9 @@ function generateLevel() {
         // stylesheet can light each one its own way.
         const walker = pig.axis === 'walk';
         element.classList.add('bird', walker ? 'pigeon' : 'crow', 'level-entity');
-        if (walker) {
-            // A drawn sprite, cloned per bird from the template at the bottom of index.html.
-            // Its parts carry classes rather than ids, so any number of them can coexist.
-            element.appendChild(pigeonSprite.content.cloneNode(true));
-        } else {
-            element.innerText = '🐦‍⬛'; // Crows are still a glyph — they are next
-        }
+        // Both species are drawn sprites now, cloned per bird from the templates at the bottom of
+        // index.html. Their parts carry classes rather than ids, so any number can coexist.
+        element.appendChild((walker ? pigeonSprite : crowSprite).content.cloneNode(true));
         element.style.left = pig.x + 'px';
         // Same ground-relative convention as every other entity, and the same one the collision
         // check below already assumed — birds used to render 40px below their own hitbox.

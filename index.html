@@ -116,8 +116,7 @@
      Authored facing LEFT like Bumbot, so --wing keeps its meaning, in a 40x40 box with the feet
      at the bottom. Real pigeon greys instead of a silhouette: with geometry we control there is
      no pale-headed glyph artwork to fight, so the flattening filter goes away and only the rim
-     light stays. The warm beak and feet plus the eye are what stop a grey blob reading as a rock.
-     Crows are still the 🐦‍⬛ glyph — they get this treatment next. -->
+     light stays. The warm beak and feet plus the eye are what stop a grey blob reading as a rock. -->
 <template id="pigeonSprite">
     <svg viewBox="0 0 40 40" aria-hidden="true">
         <g class="pig-all">
@@ -154,6 +153,40 @@
                       stroke-linecap="round"/>
                 <path d="M 20.2,37.3 L 25,37.3" fill="none" stroke="#b0793f" stroke-width="1.5"
                       stroke-linecap="round"/>
+            </g>
+        </g>
+    </svg>
+</template>
+
+<!-- The crow that works the air, cloned once per flying bird by generateLevel(). Same template
+     pattern and the same class-not-id rule as the pigeon, for the same reason: there are many.
+     Authored facing LEFT with the wings at a neutral spread; the flap rotates each wing group
+     about the shoulder at (17.5,20). No red outline any more — the city's rim light like
+     everything else alive up here, with a deep brown eye rather than a warning colour. The greys
+     run from the far wing (darkest) up through body and tail to the near wing, so the layers stay
+     separable against a night sky; true black lost them against it. Its threat reads from the fact
+     that it is flying straight at you. -->
+<template id="crowSprite">
+    <svg viewBox="0 0 40 40" aria-hidden="true">
+        <g class="crw-all">
+            <!-- Far wing first: it sits behind the body, and is darkest so the two never merge -->
+            <g class="crw-wing-far">
+                <path d="M 17.5,20 C 22,16.5 28.5,13.5 35,13 C 29.5,17 24.5,20.4 20,22.6 Z"
+                      fill="#23252c"/>
+            </g>
+            <g class="crw-tail">
+                <path d="M 27.5,20.6 L 37.5,18.2 L 37.8,23.6 L 27.5,22.8 Z" fill="#2a2c34"/>
+            </g>
+            <ellipse cx="20" cy="21" rx="9" ry="4.2" fill="#2f323a"
+                     transform="rotate(-5 20 21)"/>
+            <g class="crw-head">
+                <circle cx="11.4" cy="19.4" r="3.4" fill="#2f323a"/>
+                <path d="M 8.4,18.8 L 3.8,20 L 8.4,21.2 Z" fill="#474b54"/>
+                <circle cx="10.4" cy="18.6" r="1" fill="#1e1409"/>
+            </g>
+            <!-- Near wing last: drawn over the body, so the downstroke breaks his outline -->
+            <g class="crw-wing-near">
+                <path d="M 17.5,20 C 22,15 29,11 36,10 C 30,15 25,19 20,22 Z" fill="#3b3f48"/>
             </g>
         </g>
     </svg>
