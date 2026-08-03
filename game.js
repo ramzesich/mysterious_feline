@@ -75,6 +75,17 @@ const frameMs = 1000 / 60;  // Reference frame duration that the constants above
 const maxCatchUpFrames = 4; // Ceiling on dt so a stall can't teleport Bumbot across the map
 let lastFrameTime = 0;
 
+// Exactly one rAF callback may ever be outstanding. Every caller must go through scheduleFrame()
+// rather than calling requestAnimationFrame(update) directly: loadLevel() can now be invoked while
+// the loop is still running (the typed LEVELx code does it), and without this that would leave two
+// callbacks alive, stepping physics twice per frame at double speed.
+let frameScheduled = false;
+function scheduleFrame() {
+    if (frameScheduled) return;
+    frameScheduled = true;
+    requestAnimationFrame(update);
+}
+
 let audioCtx = null;
 function playAudioTone(freq, type, duration) {
     if (!audioCtx) audioCtx = new (window.AudioContext || window.webkitAudioContext)();
@@ -163,9 +174,41 @@ function spawnAfterImage() {
     setTimeout(() => ghost.remove(), 360);
 }
 
+// --- Typed level select: type LEVEL followed by a digit and you are dropped into it. Same idea as
+// the CATNIP stash and the same spelling constraint — no M anywhere, or every keystroke would fire
+// a Sonic Meow. Kept in its own buffer rather than sharing catnip's, so the two codes can never
+// interfere and catnip stays untouched.
+//
+// LEVEL2 goes to level 2. A digit with no level behind it does nothing at all — no tone, no
+// flicker, no reload — because the whole point of a hidden code is that a wrong guess is silent.
+// Single digit, so this covers levels 1-9; a tenth level would need a terminator key.
+//
+// Works while playing, while dead and on the win screen, because it is tracked ahead of the
+// gameActive guard exactly like the catnip code. That is what makes loadLevel() reachable mid-play,
+// and why the loop needed scheduleFrame() first.
+const levelCodePrefix = 'LEVEL';
+let levelCodeBuffer = '';
+
+function trackLevelCode(e) {
+    if (!e.key || e.key.length !== 1) return;
+    levelCodeBuffer = (levelCodeBuffer + e.key.toUpperCase()).slice(-(levelCodePrefix.length + 1));
+    if (levelCodeBuffer.length <= levelCodePrefix.length) return;
+    if (levelCodeBuffer.slice(0, levelCodePrefix.length) !== levelCodePrefix) return;
+
+    const digit = levelCodeBuffer.charAt(levelCodePrefix.length);
+    if (digit < '0' || digit > '9') return;
+
+    const index = parseInt(digit, 10) - 1;
+    if (index < 0 || index >= LEVELS.length) return; // No such level: do nothing, silently
+
+    levelCodeBuffer = '';
+    loadLevel(index); // Hides the menu and the win screen, and reloads if you are already there
+}
+
 window.addEventListener('keydown', (e) => {
-    // Ahead of the gameActive guard, so the code still works while dead or on the win screen
+    // Ahead of the gameActive guard, so both codes still work while dead or on the win screen
     trackCatnipCode(e);
+    trackLevelCode(e);
     // The whole of catnip's input surface. Unguarded like the code itself, so the rush is never
     // half-engaged after a death or a win.
     if (catnipMode && e.key === 'Shift') overclocking = true;
@@ -540,14 +583,36 @@ function cameraForY(y) {
     return cameraY;
 }
 
-function applyCamera() {
+// A vertical level's camera does NOT chase him down a miss. It holds still while he is airborne and
+// only re-aims when he lands on something solid, so missing a ledge drops him off the bottom of the
+// frame and kills him — exactly like falling into an alley in level 1, rather than treating him to a
+// long scroll down a shaft he has no way out of.
+//
+// cameraViewY is where the camera actually is; cameraAimY is where it wants to be. They differ only
+// for the moment after a landing, which is what stops each drop ending in a jolt.
+let cameraViewY = 0;
+let cameraAimY = 0;
+const cameraEase = 0.18;       // Per 60fps frame, easing toward the aim after a landing
+const offScreenDeathDrop = 80; // Grace below the visible bottom edge, matching level 1's fallDeathY
+
+function applyCamera(dt) {
     const cameraX = cameraForX(catX);
     world.style.left = (-cameraX) + 'px';
 
     // Vertical levels slide #world DOWN past the window. It is anchored by its bottom edge (see
     // applyLevelGeometry), so pushing that edge below the frame scrolls the view up through the
     // world while every child stays exactly where `bottom: 40 + y` put it.
-    if (isVertical) world.style.bottom = (-cameraForY(catY)) + 'px';
+    if (isVertical) {
+        if (dt) {
+            cameraViewY += (cameraAimY - cameraViewY) * Math.min(1, cameraEase * dt);
+        } else {
+            // No dt means the loop is stopped and someone moved him by hand — a load, a respawn, the
+            // title card. Re-aim and snap, or the next frame would ease in from the old position.
+            cameraAimY = cameraForY(catY);
+            cameraViewY = cameraAimY;
+        }
+        world.style.bottom = (-cameraViewY) + 'px';
+    }
 
     // Instead of sliding elements left, we shift their internal vector textures infinitely
     farBuildings.style.backgroundPositionX = (-(cameraX * 0.15)) + 'px';
@@ -876,7 +941,7 @@ function triggerHurtReset(cause) {
         // Re-engage main updating runtime loops loop
         gameActive = true;
         lastFrameTime = 0; // Discard the death pause so it is not treated as one huge frame
-        requestAnimationFrame(update);
+        scheduleFrame();
     }, hold);
 }
 
@@ -985,11 +1050,19 @@ function stepPhysics(dt) {
 
         catY = nextY;
 
+        // Missed a ledge. The camera stayed where he last landed, so once he is below the bottom
+        // edge of the frame he is gone — the same read as dropping into an alley in level 1, and the
+        // reason a vertical level does not need a long fall to a floor to punish a miss.
+        if (isVertical && catY < cameraViewY - offScreenDeathDrop) {
+            triggerHurtReset('pit');
+            return;
+        }
+
         if (catY <= 0) {
-            // A lethal floor is the bottom of a vertical level: the street, forty storeys down.
-            // Falling is the route in that level, so the failure state has to live here rather
-            // than in the pit list — and a dash does not save him from it either, because there
-            // is nothing below the street to drop through.
+            // A lethal floor is the bottom of a vertical level: the street. It only really comes into
+            // play on the last few ledges, where the camera has hit its clamp and can no longer be
+            // fallen out of — above that, the off-screen rule above gets him first. A dash does not
+            // save him either, because there is nothing below the street to drop through.
             if (level.lethalFloor) {
                 triggerHurtReset('pit');
                 return;
@@ -1058,6 +1131,9 @@ function stepPhysics(dt) {
 }
 
 function update(timestamp) {
+    // Cleared first, before any early return: this callback has been delivered, so the slot is free
+    // again. Leave it set on the !gameActive path and nothing could ever schedule a frame afterwards.
+    frameScheduled = false;
     if (!gameActive) return;
 
     // Measure how long the last frame actually took, expressed in 60fps frames, so a
@@ -1148,10 +1224,12 @@ function update(timestamp) {
         if (moving && ghostFrame % 3 === 0) spawnAfterImage();
     }
 
-    // 5. Camera & Infinite Parallax Layer Tracking
-    applyCamera();
+    // 5. Camera & Infinite Parallax Layer Tracking. The vertical camera only re-aims while he has
+    // solid footing, which is what makes a missed ledge fatal instead of a long ride down.
+    if (isVertical && isGrounded) cameraAimY = cameraForY(catY);
+    applyCamera(dt);
 
-    requestAnimationFrame(update);
+    scheduleFrame();
 }
 
 function loadLevel(index) {
@@ -1192,7 +1270,7 @@ function loadLevel(index) {
     catContainer.style.bottom = (40 + catY) + 'px';
     applyCamera();
     playPipeEmerge(); // Every level opens with him climbing out of something
-    requestAnimationFrame(update);
+    scheduleFrame();
 }
 
 // --- The title card. The page opens here, and Main Menu on the win screen comes back here.

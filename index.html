@@ -102,7 +102,7 @@
         </div>
     </div>
     <div id="winScreen">
-        <h1 style="color: #2ecc71;">MISSION ACCOMPLISHED</h1>
+        <h1>MISSION ACCOMPLISHED</h1>
         <p id="finalScore">Bumbot safely made it to his lunch!</p>
         <button id="winButton" onclick="handleWinButton()">Replay Level</button>
         <button id="winMenuButton" class="secondary" onclick="showStartMenu()">Main Menu</button>
@@ -118,7 +118,13 @@
     </div>
 </div>
 
-<div class="instructions">[← / →] Move &nbsp;&nbsp;&nbsp;&nbsp; [Space / ↑] Jump &nbsp;&nbsp;&nbsp;&nbsp; [M] Sonic Meow (Uses Snacks)</div>
+<!-- Each hint is its own span so the bar wraps *between* hints instead of splitting one down the
+     middle ("Sonic / Meow"), which is what happens to a single text node in a 400px portrait frame. -->
+<div class="instructions">
+    <span>[← / →] Move</span>
+    <span>[Space / ↑] Jump</span>
+    <span>[M] Sonic Meow (Uses Snacks)</span>
+</div>
 
 <!-- The pigeon that struts the deck, cloned once per walking bird by generateLevel(). A template
      rather than a live node because there are many of them, and its parts carry *classes* rather

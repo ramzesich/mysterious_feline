@@ -835,7 +835,32 @@ body {
     flex-direction: column;
     justify-content: center;
     align-items: center;
+    /* Padding plus border-box so nothing can reach the frame edge. The old layout only ever had to
+       fit a 700px letterbox; in a 400px portrait the title ran the full width and the copy wrapped
+       hard against both sides. */
+    padding: 0 26px;
+    box-sizing: border-box;
+    text-align: center;
     z-index: 50;
+}
+#winScreen h1 {
+    margin: 0;
+    color: #2ecc71;
+    font-size: 30px;
+    line-height: 1.25;
+}
+/* 20 monospace characters of "MISSION ACCOMPLISHED" is ~12 * the font size, so a 400px frame minus
+   its padding needs about this to keep the title on one line. */
+#gameWindow.vertical-level #winScreen h1 {
+    font-size: 22px;
+}
+#finalScore {
+    margin: 14px 0 0;
+    max-width: 38ch; /* Measure, not frame width: long copy stays readable in either shape. 38 keeps
+                        level 1's 35-character line whole instead of orphaning "lunch!" */
+    font-size: 14px;
+    line-height: 1.55;
+    color: #c8cdd8;
 }
 button {
     background: #2ecc71;
@@ -909,12 +934,18 @@ button.secondary:hover { background: #1b1e2c; color: #aab3c4; }
 }
 /* Fused to the bottom of the game window as one continuous frame: no top border of its own,
    so the window's 4px bottom border becomes the single divider between them, and only the
-   lower corners are rounded. 708px + border-box matches #gameWindow's outer width
-   (700 content + its 4px side borders). */
+   lower corners are rounded. The width is set inline by applyLevelGeometry() to the window's OUTER
+   width (frame + its 4px side borders); the 708px here is just the level 1 starting value.
+   Flex rather than one centred text node, so a narrow frame wraps between whole hints. */
 .instructions {
     width: 708px;
     box-sizing: border-box;
     padding: 7px 10px;
+    display: flex;
+    flex-wrap: wrap;
+    justify-content: center;
+    align-items: baseline;
+    gap: 3px 22px;
     text-align: center;
     font-size: 12px;
     color: #888;
@@ -923,6 +954,9 @@ button.secondary:hover { background: #1b1e2c; color: #aab3c4; }
     border-top: none;
     border-radius: 0 0 10px 10px;
     user-select: none;
+}
+.instructions span {
+    white-space: nowrap; /* A hint is atomic — never break "Sonic Meow" across two lines */
 }
 #skyBg {
     position: absolute;
