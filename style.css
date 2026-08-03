@@ -12,12 +12,51 @@ body {
 }
 #gameWindow {
     position: relative;
+    /* Starting size only. The frame is per-level: applyLevelGeometry() overwrites both of these
+       from level.frame, so level 1 is a 700x350 letterbox and level 2 a 400x620 portrait. */
     width: 700px;
     height: 350px;
     background: linear-gradient(#1a1c2e, #0f101b);
     border: 4px solid #333;
     border-radius: 10px 10px 0 0; /* The instructions bar rounds off the bottom */
     overflow: hidden;
+}
+/* A vertical level looks down a gap between two buildings, so the horizon layers have nowhere to
+   sit — they are a landscape frame's skyline, anchored to a ground line this level does not have.
+   The walls and the street replace them. */
+#gameWindow.vertical-level #farBuildings,
+#gameWindow.vertical-level #nearBuildings {
+    display: none;
+}
+/* The two building faces Bumbot bounces between. Painted on the frame rather than in #world
+   because they are the same all the way down, so there is nothing to scroll — the ledges moving
+   past them is what sells the descent. 130px each, which is why a ledge reaching 140px out from
+   the wall looks bolted to it rather than floating in front of it. */
+#gameWindow.vertical-level::before,
+#gameWindow.vertical-level::after {
+    content: '';
+    position: absolute;
+    top: 0;
+    bottom: 0;
+    width: 130px;
+    z-index: 4;
+    pointer-events: none;
+    background:
+        /* Window rows, on a tall irregular cycle so the wall never reads as graph paper */
+        repeating-linear-gradient(0deg,
+            transparent 0 26px, rgba(255, 196, 92, 0.05) 26px 54px, transparent 54px 92px,
+            rgba(160, 190, 235, 0.04) 92px 118px, transparent 118px 185px),
+        /* Courses of masonry, irregular for the same reason */
+        repeating-linear-gradient(0deg,
+            rgba(0, 0, 0, 0.20) 0 1px, transparent 1px 37px,
+            rgba(0, 0, 0, 0.14) 37px 38px, transparent 38px 79px),
+        linear-gradient(90deg, #1b1a22 0%, #141319 60%, #0d0c11 100%);
+}
+#gameWindow.vertical-level::before { left: 0; }
+#gameWindow.vertical-level::after {
+    right: 0;
+    /* Mirrored, so the light falls off towards the middle of the gap on both sides */
+    transform: scaleX(-1);
 }
 #ui {
     position: absolute;
@@ -37,12 +76,12 @@ body {
     left: 0;
     height: 100%;
     z-index: 10;
-    /* width is set by game.js from the active zone's worldWidth */
+    /* width is set by game.js from the active level's worldWidth */
 }
-/* One segment per stretch of solid ground between the zone's pits — and each one is the roof
+/* One segment per stretch of solid ground between the level's pits — and each one is the roof
    of a building, not a floor. Only the top few px are the deck Bumbot runs on; the rest of the
    40px band is the building's top storey falling away into shadow, which is what gives the
-   whole zone its height. Unlike the installations, periodic detail is wanted here: roofing felt
+   whole level its height. Unlike the installations, periodic detail is wanted here: roofing felt
    really is laid in even seams. */
 .ground-segment {
     position: absolute;
@@ -571,7 +610,7 @@ body {
    that reads as cat food. clip-path gives the pinched candy-wrapper silhouette; the
    horizontal gradient is red wrapper / exposed meat / red wrapper with darker seams between
    them, and ::after hatches the crimped end tabs. The red wrapper is the recognisable cue;
-   the brown centre keeps it tied to the feeder's kibble at the end of a zone. */
+   the brown centre keeps it tied to the feeder's kibble at the end of a level. */
 .snack {
     position: absolute;
     width: 34px;
@@ -621,7 +660,7 @@ body {
     0% { transform: translateY(0px); }
     100% { transform: translateY(-4px); }
 }
-/* The goal at the end of a zone: an automatic cat feeder. ::before is the hopper, ::after
+/* The goal at the end of a level: an automatic cat feeder. ::before is the hopper, ::after
    the bowl, and the two child divs are the status LED and the kibble. The goal instance is
    permanently `.active` (lunch is served); the class is reused so a dormant feeder is still
    possible later. */
@@ -724,9 +763,9 @@ body {
 .feeder.eaten .feeder-kibble {
     opacity: 0;
 }
-/* The vent pipe. Two things use it: the mid-zone checkpoint (dim and colourless until Bumbot
+/* The vent pipe. Two things use it: the mid-level checkpoint (dim and colourless until Bumbot
    walks past, so its state reads from a distance) and the scenery pipe he climbs out of at the
-   start of a zone, which game.js marks .active from the first frame. Drawn entirely in CSS
+   start of a level, which game.js marks .active from the first frame. Drawn entirely in CSS
    rather than the old 🌀 glyph — a cat has to look like he could plausibly be inside it, and a
    spinning character never did. The elbow faces right, the way he runs.
    z-index keeps it *behind* Bumbot: stacked in front it would swallow him whenever he stood
@@ -1174,7 +1213,9 @@ button.secondary:hover { background: #1b1e2c; color: #aab3c4; }
     pointer-events: none;
     z-index: 8;
     box-shadow: 0 0 15px #00f0ff, inset 0 0 15px #00f0ff;
-    transform: translate(-50%, -50%);
+    /* Positioned by `bottom` like every other entity, so the +50% pulls it back down onto the
+       anchor point rather than the -50% a top-positioned element would need. */
+    transform: translate(-50%, 50%);
     animation: rippleExpand 0.6s cubic-bezier(0.1, 0.8, 0.3, 1) forwards;
 }
 
@@ -1191,3 +1232,114 @@ button.secondary:hover { background: #1b1e2c; color: #aab3c4; }
         opacity: 0;
     }
 }
+
+/* ============================================================================================
+   LEVEL 2 — The Long Way Down. Everything below only appears in a vertical level. Grouped in one
+   block rather than folded into the sections above, because the material language is different:
+   level 1 is cast concrete and machine skins on top of a roof, this is old masonry seen from
+   outside. First pass — readable geometry, full architecture still to come.
+   ============================================================================================ */
+
+/* The street at the bottom of the shaft. Same 40px box as a roof deck, but wet asphalt instead of
+   gravel, and touching it is fatal — it is there to be looked down at, not walked on. */
+.ground-segment.street {
+    background:
+        /* Kerb line and the gutter it drains into */
+        linear-gradient(rgba(120, 116, 108, 0.35) 0 2px, transparent 2px 5px),
+        /* Sodium pools thrown down by street lamps, on a wide cycle so it is not a pattern */
+        radial-gradient(ellipse 70px 14px at 60px 4px, rgba(255, 160, 60, 0.20), transparent 70%),
+        radial-gradient(ellipse 55px 11px at 250px 6px, rgba(255, 160, 60, 0.14), transparent 70%),
+        linear-gradient(#17161c 0 6px, #101015 6px 18px, #0a0a0e 18px 100%);
+    background-repeat: no-repeat, repeat-x, repeat-x, no-repeat;
+    background-size: 100% 100%, 340px 100%, 340px 100%, 100% 100%;
+    border-top: 2px solid #2c2a30;
+}
+/* A street has no parapets — those are the cue that a gap is the space between two roofs, and
+   down here the gap is the whole level. */
+.ground-segment.street::before,
+.ground-segment.street::after {
+    display: none;
+}
+
+/* A ledge growing out of a wall. Declared after .platform so it wins on equal specificity, which
+   is how it replaces both the blue safety edge (that is level 1's "static platform" cue and means
+   nothing here) and the under-truss/support-legs pseudo-elements, which read as scaffolding rather
+   than as masonry bolted to a building. */
+.ledge {
+    background:
+        radial-gradient(circle at 28% 45%, rgba(255, 255, 255, 0.06) 0 2px, transparent 2px),
+        radial-gradient(circle at 71% 62%, rgba(0, 0, 0, 0.20) 0 2px, transparent 2px),
+        linear-gradient(#6d6558 0%, #574f45 42%, #38332c 100%);
+    border: 1px solid #2a2621;
+    border-top: 3px solid #7e7566; /* Weathered stone, lit from above */
+    box-shadow: inset 0 -4px 7px rgba(0, 0, 0, 0.35);
+}
+/* Corbels: the stone brackets holding the ledge up. Two of them, tucked under the end nearest the
+   wall, tapering away from it — which is what makes a slab read as cantilevered out of masonry. */
+.ledge::after {
+    content: '';
+    position: absolute;
+    top: 100%;
+    width: 34%;
+    height: 15px;
+    background: linear-gradient(#4e473d 0%, #332e28 100%);
+    clip-path: polygon(0% 0%, 100% 0%, 62% 100%, 0% 100%);
+}
+.ledge::before {
+    content: '';
+    position: absolute;
+    top: 100%;
+    width: 16%;
+    height: 9px;
+    background: linear-gradient(#453f36 0%, #2a2621 100%);
+}
+/* Which way the corbels taper depends on which wall the ledge grows from. */
+.ledge-left::after { left: 0; }
+.ledge-left::before { left: 42%; }
+.ledge-right::after { right: 0; transform: scaleX(-1); }
+.ledge-right::before { right: 42%; }
+
+/* Variant tints, standing in for the real architecture until the art pass. Each one only shifts
+   the top edge, so the silhouette stays honest about where the 15px collision slab is. */
+.ledge-balcony { border-top-color: #8a8072; }
+.ledge-gargoyle { border-top-color: #6f6a7d; }
+.ledge-sill { border-top-color: #7d7466; }
+.ledge-awning {
+    border-top-color: #7a4a44;
+    background: linear-gradient(#7a4a44 0%, #5c3833 45%, #3a2420 100%);
+}
+
+/* The way out: a half-open window on the second floor, lit warm from inside. The one friendly
+   thing in the level, and the only warm light below the roofline — which is what makes it read as
+   the goal from a long way up. */
+.goal-window {
+    position: absolute;
+    background:
+        /* The sash, pushed up, with the dark gap under it he squeezes through */
+        linear-gradient(rgba(28, 26, 32, 0.9) 0 20%, transparent 20% 34%,
+                        rgba(255, 206, 130, 0.28) 34% 100%),
+        linear-gradient(#3a2d1c 0%, #241b12 100%);
+    border: 3px solid #4a4038;
+    border-radius: 2px;
+    box-sizing: border-box;
+    box-shadow:
+        inset 0 0 18px rgba(255, 186, 90, 0.45),
+        0 0 22px rgba(255, 176, 70, 0.30);
+    z-index: 5; /* Behind Bumbot, like the vent pipe — he goes *into* it */
+    animation: goalWindowGlow 3.4s ease-in-out infinite;
+}
+@keyframes goalWindowGlow {
+    0%, 100% { box-shadow: inset 0 0 18px rgba(255, 186, 90, 0.40), 0 0 20px rgba(255, 176, 70, 0.26); }
+    50% { box-shadow: inset 0 0 22px rgba(255, 186, 90, 0.55), 0 0 30px rgba(255, 176, 70, 0.40); }
+}
+
+/* Getting in: the exact reverse of catEmerge, because every entrance and exit in this game is
+   Bumbot squeezing through a gap that looks too small for him. On #catContainer, so it never has
+   to re-state scaleX(var(--face)). */
+@keyframes catEnter {
+    0% { transform: translateX(0) scale(1); opacity: 1; }
+    30% { transform: translateX(4px) scale(0.94, 1.04); opacity: 1; }
+    70% { transform: translateX(12px) scale(0.66); opacity: 1; }
+    100% { transform: translateX(19px) scale(0.42); opacity: 0; }
+}
+.cat-enter { animation: catEnter 1s cubic-bezier(0.4, 0, 0.7, 1) forwards; }

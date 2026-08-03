@@ -16,14 +16,14 @@
 
     <div id="ui">
         <div id="energyDisplay">Snacks: 0</div>
-        <!-- Hidden until the catnip stash is found -->
+        <!-- Hidden until the catnip stash is found. The tag only — the telemetry readout went
+             when catnip was cut back to its single Shift verb. -->
         <div id="devPanel">
-            <span id="telemetry"></span>
             <span id="catnipTag">🌿 CATNIP</span>
         </div>
     </div>
     <div id="world">
-        <!-- Ground segments, pit voids and the portal checkpoint are generated per zone by game.js -->
+        <!-- Ground segments, pit voids and the portal checkpoint are generated per level by game.js -->
         <!-- The goal: a cat feeder standing on the ground, stocked. Positioned by game.js. -->
         <div id="goalFeeder" class="feeder active">
             <div class="feeder-hopper"></div>
@@ -104,11 +104,11 @@
     <div id="winScreen">
         <h1 style="color: #2ecc71;">MISSION ACCOMPLISHED</h1>
         <p id="finalScore">Bumbot safely made it to his lunch!</p>
-        <button id="winButton" onclick="handleWinButton()">Replay Zone</button>
+        <button id="winButton" onclick="handleWinButton()">Replay Level</button>
         <button id="winMenuButton" class="secondary" onclick="showStartMenu()">Main Menu</button>
     </div>
     <!-- The title card. Covers the window on load and after Main Menu, sitting over a real
-         still frame of the zone rather than a flat colour — game.js builds the level and
+         still frame of the level rather than a flat colour — game.js builds the level and
          hand-draws one frame behind this, because the game loop is not running yet.
          #menuCat is filled in by game.js with a snapshot clone of Bumbot's sprite. -->
     <div id="startScreen">
@@ -202,7 +202,11 @@
     </svg>
 </template>
 
-<!-- Load Game Logic Files -->
+<!-- Load Game Logic Files. Order matters and there is no module system: each level file declares
+     one global const, map.js collects them into LEVELS, then game.js consumes it. A new level
+     needs its <script> tag here, above map.js. -->
+<script src="levels/level_1.js"></script>
+<script src="levels/level_2.js"></script>
 <script src="map.js"></script>
 <script src="game.js"></script>
 </body>
