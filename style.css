@@ -810,6 +810,64 @@ button {
     margin-top: 20px;
 }
 button:hover { background: #27ae60; }
+/* Secondary action on an overlay: present but not competing with the green one */
+button.secondary {
+    background: transparent;
+    color: #7d8698;
+    border: 2px solid #333a4a;
+    font-size: 13px;
+    padding: 6px 14px;
+    margin-top: 10px;
+}
+button.secondary:hover { background: #1b1e2c; color: #aab3c4; }
+
+/* The title card. Deliberately NOT opaque: a still frame of the rooftops sits behind it, so
+   the menu already shows what the game looks like. Same full-window overlay pattern as
+   #winScreen but one layer above it, because Main Menu is reachable from the win screen. */
+#startScreen {
+    display: flex;
+    position: absolute;
+    top: 0; left: 0; width: 100%; height: 100%;
+    background:
+        radial-gradient(ellipse 70% 60% at 50% 40%, rgba(20, 14, 40, 0.72), rgba(8, 6, 18, 0.94)),
+        linear-gradient(rgba(11, 7, 26, 0.55), rgba(11, 7, 26, 0.8));
+    flex-direction: column;
+    justify-content: center;
+    align-items: center;
+    z-index: 60;
+}
+#menuTitle {
+    margin: 6px 0 0;
+    font-size: 52px;
+    letter-spacing: 10px;
+    color: #f2eee8;
+    /* Lit by the same city as everything else: warm street light one side, cool bounce the
+       other, over a soft cyan bloom that ties the title to the feeder and the vent pipes. */
+    text-shadow:
+        -2px -2px 0 rgba(255, 194, 128, 0.55),
+        2px 2px 0 rgba(126, 170, 235, 0.45),
+        0 0 22px rgba(0, 240, 255, 0.35),
+        0 6px 18px rgba(0, 0, 0, 0.9);
+}
+/* Bumbot waiting on the title card. The sprite is a snapshot clone with its ids stripped
+   (see cloneCatSprite in game.js), so none of the id-driven part animations reach it — the
+   breathing has to be on this box instead, and that is the whole reason it is here. */
+#menuCat {
+    width: 100px;
+    height: 84px;
+    filter:
+        drop-shadow(-2px -2px 0px rgba(255, 194, 128, 0.9))
+        drop-shadow(2px 2px 0px rgba(126, 170, 235, 0.6))
+        drop-shadow(0px 0px 10px rgba(0, 0, 0, 0.85));
+    transform-origin: bottom center;
+    animation: catIdle 6.2s ease-in-out infinite;
+}
+#menuCat svg {
+    display: block;
+    width: 100%;
+    height: 100%;
+    transform: scaleX(-1); /* Authored facing left; the menu wants him facing right, as in play */
+}
 /* Fused to the bottom of the game window as one continuous frame: no top border of its own,
    so the window's 4px bottom border becomes the single divider between them, and only the
    lower corners are rounded. 708px + border-box matches #gameWindow's outer width

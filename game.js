@@ -6,6 +6,8 @@ const energyDisplay = document.getElementById('energyDisplay');
 const winScreen = document.getElementById('winScreen');
 const winButton = document.getElementById('winButton');
 const finalScore = document.getElementById('finalScore');
+const startScreen = document.getElementById('startScreen');
+const menuCat = document.getElementById('menuCat');
 const goalFeeder = document.getElementById('goalFeeder');
 const farBuildings = document.getElementById('farBuildings');
 const nearBuildings = document.getElementById('nearBuildings');
@@ -35,7 +37,10 @@ let isGrounded = true;
 let groundedOn = null; // The entity Bumbot is standing on, so movers can carry him
 let respawnX = zone.spawnX; // Moved forward by the cat feeder checkpoint
 let snacks = 1; // Snacks in the pouch; each one powers exactly one Sonic Meow
-let gameActive = true;
+// The page now opens on the title card, so play does not begin until Start is pressed:
+// gameActive stays false and the loop is never started until then.
+let gameActive = false;
+let menuActive = true;
 let faceDirection = 1;
 
 // --- Tunables. Values are "per 60fps frame" and get scaled by dt, so they mean
@@ -153,15 +158,24 @@ function handleCatnipKeys(e) {
     }
 }
 
+// A frozen snapshot of however Bumbot is currently drawn, safe to put anywhere in the document.
+// Shared by the dash trail and the title card, and it has to do two things:
+//   * strip the ids — they would duplicate the live sprite's, and a snapshot does not want
+//     parts that carry on animating on their own.
+//   * drop #bbFur first. Its "hidden unless spooked" state is an *id* selector, so once the
+//     ids are gone the raised-fur spikes render — a snapshot has no fright state to show.
+function cloneCatSprite() {
+    const svg = cat.firstElementChild.cloneNode(true);
+    const fur = svg.querySelector('#bbFur');
+    if (fur) fur.remove();
+    svg.querySelectorAll('[id]').forEach(node => node.removeAttribute('id'));
+    return svg;
+}
+
 function spawnAfterImage() {
     const ghost = document.createElement('div');
     ghost.classList.add('after-image');
-    // A clone of the live sprite, so the trail can never drift out of sync with how he is drawn.
-    // Its ids are stripped: they would be duplicates of the live sprite's, and a motion trail
-    // wants a frozen snapshot rather than parts that carry on animating behind him.
-    const ghostSprite = cat.firstElementChild.cloneNode(true);
-    ghostSprite.querySelectorAll('[id]').forEach(node => node.removeAttribute('id'));
-    ghost.appendChild(ghostSprite);
+    ghost.appendChild(cloneCatSprite());
     ghost.style.left = catX + 'px';
     ghost.style.bottom = (40 + catY) + 'px';
     ghost.style.transform = 'scaleX(' + (-faceDirection) + ')';
@@ -183,6 +197,16 @@ window.addEventListener('keydown', (e) => {
     // Ahead of the gameActive guard, so the code still works while dead or on the win screen
     trackCatnipCode(e);
     if (catnipMode) handleCatnipKeys(e);
+
+    // The title card answers to Enter or Space as well as the button, so a run can be started
+    // without reaching for the mouse. Everything below is play input and stays blocked.
+    if (menuActive) {
+        if (e.key === 'Enter' || e.code === 'Space') {
+            e.preventDefault();
+            handleStartButton();
+        }
+        return;
+    }
 
     if (!gameActive) return;
     if (e.key === 'ArrowLeft' || e.key === 'ArrowRight' || e.key === 'ArrowUp' || e.code === 'Space') {
@@ -423,6 +447,24 @@ function isDashing() {
     return catnipMode && overclocking;
 }
 
+// The camera clamp, in one place. Three callers need it and they used to each carry their own
+// copy: the game loop, the Sonic Meow's screen-clearing bounds, and the still frame drawn
+// behind the title card.
+function cameraFor(x) {
+    let cameraX = x - (windowWidth / 2) + 25;
+    if (cameraX < 0) cameraX = 0;
+    if (cameraX > worldWidth - windowWidth) cameraX = worldWidth - windowWidth;
+    return cameraX;
+}
+
+function applyCamera() {
+    const cameraX = cameraFor(catX);
+    world.style.left = (-cameraX) + 'px';
+    // Instead of sliding elements left, we shift their internal vector textures infinitely
+    farBuildings.style.backgroundPositionX = (-(cameraX * 0.15)) + 'px';
+    nearBuildings.style.backgroundPositionX = (-(cameraX * 0.40)) + 'px';
+}
+
 function triggerSonicMeow() {
     if (snacks <= 0) {
         playAudioTone(150, 'sine', 0.1);
@@ -454,9 +496,7 @@ function triggerSonicMeow() {
     setTimeout(() => ripple.remove(), 600);
 
     // Dynamic viewport boundary limits calculation
-    let currentCameraX = catX - (windowWidth / 2) + 25;
-    if (currentCameraX < 0) currentCameraX = 0;
-    if (currentCameraX > worldWidth - windowWidth) currentCameraX = worldWidth - windowWidth;
+    let currentCameraX = cameraFor(catX);
 
     let viewLeftBound = currentCameraX;
     let viewRightBound = currentCameraX + windowWidth;
@@ -963,14 +1003,7 @@ function update(timestamp) {
     }
 
     // 5. Camera & Infinite Parallax Layer Tracking
-    let cameraX = catX - (windowWidth / 2) + 25;
-    if (cameraX < 0) cameraX = 0;
-    if (cameraX > worldWidth - windowWidth) cameraX = worldWidth - windowWidth;
-    world.style.left = (-cameraX) + 'px';
-
-    // Instead of sliding elements left, we shift their internal vector textures infinitely
-    farBuildings.style.backgroundPositionX = (-(cameraX * 0.15)) + 'px';
-    nearBuildings.style.backgroundPositionX = (-(cameraX * 0.40)) + 'px';
+    applyCamera();
 
     requestAnimationFrame(update);
 }
@@ -989,6 +1022,9 @@ function loadZone(index) {
 
     energyDisplay.innerText = "Snacks: " + snacks;
     winScreen.style.display = 'none';
+    // Any route into a zone leaves the title card behind, whether it came through Start or not
+    startScreen.style.display = 'none';
+    menuActive = false;
 
     // Clear everything the victory sequence and idle settling left on him
     cat.classList.remove('munching', 'cat-run', 'cat-air');
@@ -1005,6 +1041,59 @@ function loadZone(index) {
     requestAnimationFrame(update);
 }
 
+// --- The title card. The page opens here, and Main Menu on the win screen comes back here.
+// It is not a flat colour over nothing: the zone is built and one frame is hand-drawn behind the
+// overlay, so the menu shows the actual rooftops with Bumbot standing at his pipe. The game loop
+// stays stopped the whole time it is up.
+function showStartMenu() {
+    menuActive = true;
+    gameActive = false;
+    winScreen.style.display = 'none';
+    startScreen.style.display = 'flex';
+
+    // A menu is not a run, so the catnip wears off here for the same reason it does in loadZone
+    disableCatnip();
+
+    // Zone 1's opening is the backdrop, whichever zone was last played
+    zoneIndex = 0;
+    zone = ZONES[zoneIndex];
+    applyZoneGeometry();
+
+    catX = zone.spawnX; catY = 0; velocityY = 0; isGrounded = true; groundedOn = null;
+    wasInAirBefore = false;
+    respawnX = zone.spawnX;
+    snacks = 1;
+    idleFrames = 0;
+
+    // Everything a win or a death may have left on him, cleared before he is drawn standing still
+    cat.classList.remove('munching', 'cat-run', 'cat-air', 'cat-spooked');
+    catContainer.classList.remove('cat-idle', 'cat-launch', 'cat-land', 'cat-emerge',
+                                  'cat-bail', 'cat-plunge');
+    catContainer.style.setProperty('--face', -1);
+    goalFeeder.classList.remove('eaten');
+
+    generateLevel();
+
+    // update() is not running and will not run until Start, so this one frame is drawn by hand —
+    // the same reason startVictoryMunch and the respawn both hand-draw their positions.
+    catContainer.style.left = catX + 'px';
+    catContainer.style.bottom = (40 + catY) + 'px';
+    applyCamera();
+
+    // The cat on the card itself. Built once: it is a frozen snapshot and never needs refreshing.
+    if (!menuCat.firstElementChild) menuCat.appendChild(cloneCatSprite());
+}
+
+// Wired to the Start button and to Enter/Space on the title card
+function handleStartButton() {
+    startScreen.style.display = 'none';
+    menuActive = false;
+    // Whichever way Start was pressed, it is a user gesture — which is what lets the
+    // AudioContext actually make a sound, so the zone's opening tones are the first
+    // ones that reliably play.
+    loadZone(0);
+}
+
 // Wired to the win screen button: move on if another zone exists, otherwise replay
 function handleWinButton() {
     loadZone(zoneIndex + 1 < ZONES.length ? zoneIndex + 1 : zoneIndex);
@@ -1014,4 +1103,4 @@ function resetGame() {
     loadZone(zoneIndex);
 }
 
-loadZone(0);
+showStartMenu();

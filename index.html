@@ -105,6 +105,16 @@
         <h1 style="color: #2ecc71;">MISSION ACCOMPLISHED</h1>
         <p id="finalScore">Bumbot safely made it to his lunch!</p>
         <button id="winButton" onclick="handleWinButton()">Replay Zone</button>
+        <button id="winMenuButton" class="secondary" onclick="showStartMenu()">Main Menu</button>
+    </div>
+    <!-- The title card. Covers the window on load and after Main Menu, sitting over a real
+         still frame of the zone rather than a flat colour — game.js builds the level and
+         hand-draws one frame behind this, because the game loop is not running yet.
+         #menuCat is filled in by game.js with a snapshot clone of Bumbot's sprite. -->
+    <div id="startScreen">
+        <div id="menuCat"></div>
+        <h1 id="menuTitle">BUMBOT</h1>
+        <button id="startButton" onclick="handleStartButton()">Start</button>
     </div>
 </div>
 

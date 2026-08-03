@@ -16,7 +16,7 @@ No build, no dependencies, no tests, no lint. Open `index.html` in a browser
 `map.js` defines `ZONES`, then `game.js` consumes it. There is no module system —
 don't add `import`/`export` without also changing the script tags.
 
-Verify changes by actually playing: climb out of the spawn pipe, move right, jump onto a
+Verify changes by actually playing: press Start on the title card, climb out of the spawn pipe, move right, jump onto a
 catwalk, touch razor wire (fur up, bail off screen, respawn out of a pipe), fall into an alley, ride a
 gondola, walk into a strutting pigeon, get hit by a crow, pass the checkpoint pipe then die (should respawn there),
 press `M` (ripple + installations shatter), reach the feeder and watch the munch sequence before
@@ -26,7 +26,7 @@ the win screen.
 
 | File | Role |
 |---|---|
-| `index.html` | DOM skeleton: parallax layers, UI, `#world`, Bumbot's SVG sprite, win screen. Static elements only. |
+| `index.html` | DOM skeleton: parallax layers, UI, `#world`, Bumbot's SVG sprite, bird templates, win screen, title card. Static elements only. |
 | `map.js` | `ZONES` — all level data, plus a header comment stating the design budget. |
 | `game.js` | Everything else: input, physics, collision, particles, camera, audio. |
 | `style.css` | All visuals, hitbox-relevant sizes, and keyframe animations. |
@@ -106,10 +106,12 @@ Rig notes:
   runs the same animation with a `-0.17s` delay — half of 0.34s — so it starts mid-stride.
 - `game.js` toggles `cat-run` and `cat-air` on `#cat` from `isGrounded` and the arrow keys, in
   `update()` next to the idle-settling block. Both are cleared in `loadZone()`,
-  `startVictoryMunch()` and `triggerHurtReset()`, because those three stop the loop — leave them
-  on and he chews or dies with his legs still striding.
-- `spawnAfterImage()` clones the live sprite and strips the clone's `id`s: they would duplicate
-  the original's, and a motion trail wants a frozen snapshot.
+  `startVictoryMunch()`, `triggerHurtReset()` and `showStartMenu()`, because those four stop the
+  loop — leave them on and he chews or dies with his legs still striding.
+- `cloneCatSprite()` takes a frozen snapshot of the live sprite for the dash trail and the title
+  card. It strips the clone's `id`s (they would duplicate the original's, and a snapshot does not
+  want parts still animating) and **removes `#bbFur` first** — the raised-fur spikes are hidden by
+  an *id* selector, so a stripped clone would otherwise render permanently spooked.
 - Only the birds keep `brightness(0)` in their filter stacks. On Bumbot it would crush his
   per-part shading to one black shape; the dash ghosts keep it deliberately, because a trail
   should read flat.
@@ -271,7 +273,7 @@ unreachable, and it invalidates `map.js`'s design budget.
 entirely** — whoever cleared the flag must restart it with `requestAnimationFrame(update)`
 *and* reset `lastFrameTime = 0`, so the pause isn't billed as one enormous frame. Existing
 restart sites: `triggerHurtReset()` (after the death animation, 520-800ms depending on cause) and
-`loadZone()`.
+`loadZone()`. The page now *loads* with the flag clear, because it opens on the title card.
 
 Two reset paths, deliberately different:
 - `triggerHurtReset(cause)` (death) — returns to `respawnX` (the checkpoint pipe if passed, else
@@ -319,8 +321,34 @@ reading as visibly repeating wallpaper. Two consequences: the CSS sets the short
 JS can override `background-position-x` alone and keep the bottom anchoring, and adding a
 band on a width that shares a factor with the others will reintroduce a short repeat.
 
-The same camera clamp is duplicated inside `triggerSonicMeow()` to find the visible bounds.
-If you change camera math, change both.
+The same camera clamp is wanted in three places — the loop, `triggerSonicMeow()`'s visible
+bounds, and the still frame behind the title card — so it lives in `cameraFor(x)`, with
+`applyCamera()` writing `world.style.left` and both parallax offsets. It used to be copied into
+the meow by hand; don't re-fork it.
+
+## The start menu
+
+The page opens on `#startScreen`, not in play: `gameActive` starts `false`, `menuActive` starts
+`true`, and the bottom of `game.js` calls `showStartMenu()` instead of `loadZone(0)`.
+
+The card is deliberately **translucent over a real still frame** — `showStartMenu()` builds zone 1,
+parks Bumbot at his spawn pipe, then hand-draws that one frame (`catContainer` position plus
+`applyCamera()`) because the loop is not running and nothing else will draw it. Anything that stops
+the loop and moves him has to hand-draw, exactly as the respawn and the munch already do.
+
+- `menuActive` is checked in `keydown` *after* `trackCatnipCode()` (so the stash can still be
+  found from the menu) but *before* the `gameActive` guard, where it takes Enter/Space as Start
+  and swallows everything else — that's what stops a `Space` press to start from also being
+  buffered as a jump.
+- `handleStartButton()` and `showStartMenu()` are both called from inline `onclick`s in
+  `index.html`, so like `handleWinButton()` they must stay global functions.
+- `loadZone()` clears `menuActive` and hides the card itself, so every route into a zone leaves
+  the menu behind whether or not it came through Start.
+- Start is also the user gesture browsers require before an `AudioContext` will sound, so the
+  zone's opening tones are now the first ones that reliably play.
+- `#menuCat` is a `cloneCatSprite()` snapshot, built once. Its ids are gone, so none of the
+  id-driven part animations reach it — the breathing is `catIdle` on the box instead. Give the
+  parts class hooks if the menu ever needs a tail sway.
 
 ## Sonic Meow
 
