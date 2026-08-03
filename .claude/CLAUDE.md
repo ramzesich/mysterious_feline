@@ -471,38 +471,67 @@ against a hardcoded `310` (the 350px frame minus the ground) — exactly the kin
 
 ## Catnip (hidden dev mode)
 
-**Being redesigned — the user has a new direction for this. Treat the current shape as a stop on
-the way, not a settled design.**
+Typing `CATNIP` toggles a developer mode, framed in-fiction as Bumbot finding a stash. It has **two
+tiers**, and the split is deliberate: the first is discoverable by just walking into something, the
+second needs a key.
 
-Typing `CATNIP` toggles a developer mode, framed in-fiction as Bumbot finding a stash. It now grants
-exactly **one** thing: hold `Shift` and nothing stops him. The `[` / `]` warp, `G` invulnerability
-and the telemetry readout were all removed, along with `nearestSolidX()` which only existed to serve
-them. While active, Bumbot's outline turns catnip-green and a `🌿 CATNIP` tag shows, so you can never
-mistake cheat mode for normal play.
+**Tier 1 — catnip on, no key held.** Anything alive or sharp dies on contact instead of killing him:
+birds vaporize, spikes shatter, via the shared `vaporizeBird()` / `shatterEntity()` helpers. Gated on
+`catnipMode` alone (the `smashesHazards` flag in `handleOverlapSystems`).
 
-The single verb was kept because its *meaning* falls out of the level's axis for free, with no
-per-axis code: `isDashing()` (catnip mode plus `Shift`) is 4× speed and skips horizontal and
-airborne solid collision, so running level 1 he ploughs through obstacles, and falling level 2 he
-drops through every ledge on the way down. Pits are treated as whole ground; pillars, spikes and
-birds are destroyed on contact via the shared `shatterEntity()` / `vaporizeBird()` helpers. The
-checkpoint portal, snacks and the goal are all overlap-only, so they keep working at dash speed.
+What tier 1 pointedly does **not** do — and this is the whole shape of the design:
 
-Note the one thing a `lethalFloor` does **not** yield to: there is nothing below the street to drop
-through, so the dash does not save him from it.
+- **Geometry stays solid.** Pillars, platforms and movers still block him. The pillar-shatter branch
+  stays gated on `dashing`, because catnip alone can never reach the inside of a pillar to trigger it.
+- **Falling still kills.** Pits, `lethalFloor` and the vertical off-screen rule all ignore catnip.
+
+So tier 1 makes him invincible to *things* without letting him ignore the level.
+
+**Tier 2 — hold `Shift`.** The dash, unchanged: `isDashing()` (catnip mode plus `Shift`) is 4× speed
+and suspends the level itself — horizontal and airborne solid collision are both skipped, pits are
+treated as whole ground, and pillars are destroyed on contact too. The checkpoint portal, snacks and
+the goal are all overlap-only, so they keep working at dash speed.
+
+Note the one thing a `lethalFloor` does not yield to even here: there is nothing below the street to
+drop through, so the dash does not save him from it.
+
+While active, Bumbot's outline turns catnip-green and the HUD shows `🌿 CATNIP` plus a hint line
+naming both tiers. The hint exists because the mode was previously undiscoverable — the green outline
+said "something changed" but not what, and the only power was invisible until you guessed `Shift`.
+`#devPanel` is a right-aligned column for that reason: the hint is too long to sit in a row beside
+the snack counter in a 400px portrait frame.
 
 Two implementation constraints worth preserving:
 - The code contains **no `M`** — `M` is bound unconditionally to Sonic Meow, so any code
-  containing it would fire a meow per keystroke. That rules out `MEOW`, `BUMBOT`, etc.
+  containing it would fire a meow per keystroke. That rules out `MEOW`, `BUMBOT`, etc. The same
+  constraint applies to the typed `LEVELx` code, which is why it is spelled that way.
 - `trackCatnipCode()` runs *before* the `gameActive` guard in the `keydown` handler, so the
   code still works while dead or on the win screen. The `Shift` keydown and keyup are likewise
   unguarded, or the sprint could stick on.
+
+When a new hazard is added (the broom, the perched pigeon), it has to opt into tier 1 — i.e. route its
+contact through the same `smashesHazards` check — or catnip will silently fail to protect against it.
 
 Session-only by design — nothing is persisted, and `loadLevel()` calls `disableCatnip()`, so
 both a reload and a restart-after-finishing give you a clean game. The one exception is the
 `?level=N#fast` test URL, which re-arms it *after* `loadLevel()` for exactly that reason.
 
-Level select is deliberately **not** part of catnip: `?level=N` (see "Running it") is a way to skip
-to a level you want to look at, not a power Bumbot has.
+## Level select (two ways in)
+
+Neither is part of catnip: skipping to a level is not a power Bumbot has, it's a way for you to look
+at one.
+
+- **Typed `LEVELx`** — type `LEVEL2` anywhere (title card, mid-run, dead, win screen) to jump there.
+  A digit with no level behind it does **nothing at all**, silently, because a wrong guess at a hidden
+  code shouldn't announce itself. Single digit, so levels 1-9. Own buffer, separate from catnip's, so
+  the two codes can't interfere.
+- **`?level=N` URL** — boots straight in, skipping the title card; `#fast` also arms catnip. Handy as
+  a bookmark. Out-of-range falls back to the menu rather than being clamped.
+
+The typed code is why `scheduleFrame()` exists: it can call `loadLevel()` while the loop is still
+running, and every other caller reached `loadLevel()` only once the loop had already stopped. Two
+outstanding `requestAnimationFrame` callbacks would step physics twice per frame. **Never call
+`requestAnimationFrame(update)` directly** — go through `scheduleFrame()`.
 
 ## Audio
 

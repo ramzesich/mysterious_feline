@@ -106,10 +106,14 @@ function playAudioTone(freq, type, duration) {
 // Sonic Meow on every keystroke, which rules out MEOW, BUMBOT and most obvious words.
 // Session-only on purpose: nothing is persisted, so a reload is always a clean game.
 //
-// It grants exactly ONE thing: hold Shift and nothing stops him. The warp keys, god mode and the
-// telemetry readout were all removed — a single verb that reads the same in both levels is worth
-// more than a panel of switches. What that verb *means* falls out of the level's axis for free:
-// running level 1 he ploughs through obstacles, falling level 2 he drops through every ledge.
+// Two tiers, and the split is the point:
+//   * catnip on, nothing held — anything alive or sharp dies on contact instead of killing him
+//     (see smashesHazards in handleOverlapSystems). Discoverable by simply walking into a bird.
+//     Geometry stays solid and falling still kills, so he is invincible to *things* but cannot
+//     ignore the level.
+//   * hold Shift — the dash on top: 4x speed and nothing stops him at all, level included.
+// The HUD names both, because the first version of this hid its only power behind a key nobody
+// knew to press.
 const catnipCode = 'CATNIP';
 const overclockMultiplier = 4; // Hold Shift: crosses level 1 in ~10s instead of ~38s
 let catnipBuffer = '';
@@ -730,11 +734,20 @@ function handleOverlapSystems() {
 
     const dashing = isDashing();
 
+    // Catnip's own power, available the moment it is on and with no key held: anything alive or sharp
+    // dies on contact instead of killing him. That is the half a player can actually discover by
+    // walking into something, which is why it is no longer gated behind Shift.
+    //
+    // Deliberately limited to hazards. Geometry — pillars, platforms, movers — stays solid, and
+    // falling stays lethal, so catnip on its own makes him invincible to *things* without letting him
+    // ignore the level. Only the Shift dash suspends the level itself.
+    const smashesHazards = catnipMode;
+
     BirdEntities.forEach(pig => {
         if (!pig.active) return;
-        // The glyph floats inside a 40px box, so the hitbox is inset to match the bird
+        // The sprite floats inside a 40px box, so the hitbox is inset to match the bird
         if (catX < pig.x + 34 && catX + catWidth > pig.x + 6 && catY < pig.y + 32 && catY + catHeight > pig.y + 8) {
-            if (dashing) vaporizeBird(pig);
+            if (smashesHazards) vaporizeBird(pig);
             else triggerHurtReset();
         }
     });
@@ -745,13 +758,14 @@ function handleOverlapSystems() {
         if (obj.type === 'spike') {
             const base = obj.y || 0;
             if (catX < obj.x + obj.width && catX + catWidth > obj.x && catY < base + obj.height && catY + catHeight > base) {
-                if (dashing) shatterEntity(obj);
+                if (smashesHazards) shatterEntity(obj);
                 else triggerHurtReset();
             }
         }
 
-        // Pillars are solid, so they are normally never checked here — only a dash can
-        // occupy the same space as one, and when it does the pillar loses.
+        // Pillars are solid, so they are normally never checked here at all — catnip alone cannot
+        // reach the inside of one. Only a dash can occupy the same space, and when it does the
+        // pillar loses. This stays gated on `dashing` for exactly that reason.
         if (dashing && obj.type === 'pillar') {
             if (catX < obj.x + obj.width && catX + catWidth > obj.x && catY < obj.height && catY + catHeight > 0) {
                 shatterEntity(obj);

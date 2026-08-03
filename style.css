@@ -1014,10 +1014,13 @@ button.secondary:hover { background: #1b1e2c; color: #aab3c4; }
     z-index: 3;
 }
 /* --- Catnip (hidden dev mode). Nothing here is visible until CATNIP is typed. --- */
+/* A column, right-aligned: the hint line is long enough that a row would collide with the snack
+   counter in a 400px portrait frame. */
 #devPanel {
     display: none;
-    align-items: center;
-    gap: 12px;
+    flex-direction: column;
+    align-items: flex-end;
+    gap: 2px;
     font-size: 12px;
 }
 #devPanel.visible {
@@ -1028,11 +1031,11 @@ button.secondary:hover { background: #1b1e2c; color: #aab3c4; }
     text-shadow: 0 0 8px rgba(142, 242, 164, 0.85);
     letter-spacing: 1px;
 }
-#telemetry {
-    color: #00f0ff;
+#catnipHint {
+    color: #6fbf85;
+    font-size: 10px;
     font-weight: normal;
-    font-size: 11px;
-    opacity: 0.85;
+    letter-spacing: 0.5px;
     text-shadow: 1px 1px black;
 }
 /* Bumbot's outline turns catnip-green while the rush is available. No brightness(0): his own
