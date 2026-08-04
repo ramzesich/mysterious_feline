@@ -111,7 +111,9 @@ function playAudioTone(freq, type, duration) {
 //     (see smashesHazards in handleOverlapSystems). Discoverable by simply walking into a bird.
 //     Geometry stays solid and falling still kills, so he is invincible to *things* but cannot
 //     ignore the level.
-//   * hold Shift — the dash on top: 4x speed and nothing stops him at all, level included.
+//   * hold Shift — the dash on top: 4x speed, and pillars are destroyed rather than collided with.
+//     Slabs stay solid underfoot, because in a vertical level the ledges are the only ground there
+//     is; see isDashing() for why that split matters.
 // The HUD names both, because the first version of this hid its only power behind a key nobody
 // knew to press.
 const catnipCode = 'CATNIP';
@@ -562,10 +564,38 @@ function vaporizeBird(pig) {
     setTimeout(() => pig.dom.remove(), 300);
 }
 
-// The catnip dash: Shift held in catnip mode. Nothing stops him — pillars and spikes
-// shatter, birds vaporize, pits are crossed as if the ground were whole.
+// The catnip dash: Shift held in catnip mode. 4x speed, and geometry splits in two.
+//
+// A pillar is an OBSTACLE and loses — rubble the moment he touches it. A slab (platform or mover) is
+// FOOTING, which is a different thing entirely: in a vertical level the ledges are the only ground
+// there is, so passing through one means falling to his death. The rule that satisfies both is
+// "too fast to be stopped sideways, but he still lands on his feet" — slabs do not block him
+// horizontally at 4x, and they do still catch him on the way down.
 function isDashing() {
     return catnipMode && overclocking;
+}
+
+// Pillars in the path of a dash step, destroyed rather than collided with.
+function smashPillarsAt(targetX, targetY) {
+    for (const obj of RuntimeEntities) {
+        if (!obj.active || obj.type !== 'pillar') continue;
+        if (targetX < obj.x + obj.width && targetX + 35 > obj.x &&
+            targetY < obj.height && targetY + 45 > 0) {
+            shatterEntity(obj);
+        }
+    }
+}
+
+// Vertical resolution while dashing: a pillar is smashed and stops blocking, a slab still catches
+// him. This is what stopped the dash being a death sentence in a vertical level.
+function dashLandingCollision(targetX, targetY) {
+    const hit = checkSolidCollision(targetX, targetY);
+    if (!hit) return null;
+    if (hit.type === 'pillar') {
+        shatterEntity(hit);
+        return null;
+    }
+    return hit;
 }
 
 // The camera clamps, in one place. Several callers need them and they used to each carry their own
@@ -1006,9 +1036,9 @@ function stepPhysics(dt) {
     // 0. Move the platforms before the player, so a passenger rides along cleanly
     updateMovers(dt);
 
-    // Catnip rush. 4x of 7px is 28px per slice, still under the 40px pillar width, so
-    // sprinting cannot tunnel through a solid. While dashing nothing blocks him at all —
-    // solid collision is skipped and whatever he hits is destroyed in handleOverlapSystems.
+    // Catnip rush. 4x of 7px is 28px per slice, still under the 40px pillar width, so sprinting
+    // cannot tunnel past a solid between checks. Slabs do not block him sideways at this speed;
+    // pillars in the way are destroyed instead of collided with.
     const dashing = isDashing();
     const speed = moveSpeed * (dashing ? overclockMultiplier : 1);
 
@@ -1017,14 +1047,24 @@ function stepPhysics(dt) {
         faceDirection = 1;
         catContainer.style.setProperty('--face', -1);
         const step = speed * dt;
-        if (dashing || !checkSolidCollision(catX + step, catY)) catX += step;
+        if (dashing) {
+            smashPillarsAt(catX + step, catY);
+            catX += step;
+        } else if (!checkSolidCollision(catX + step, catY)) {
+            catX += step;
+        }
         if (catX > worldWidth - 50) catX = worldWidth - 50;
     }
     if (keys.ArrowLeft) {
         faceDirection = -1;
         catContainer.style.setProperty('--face', 1);
         const step = speed * dt;
-        if (dashing || !checkSolidCollision(catX - step, catY)) catX -= step;
+        if (dashing) {
+            smashPillarsAt(catX - step, catY);
+            catX -= step;
+        } else if (!checkSolidCollision(catX - step, catY)) {
+            catX -= step;
+        }
         if (catX < 0) catX = 0;
     }
 
@@ -1040,8 +1080,8 @@ function stepPhysics(dt) {
     if (!isGrounded) {
         velocityY -= gravity * dt;
         let nextY = catY + velocityY * dt;
-        // Dashing runs straight through platforms and movers instead of landing on them
-        let hitObj = dashing ? null : checkSolidCollision(catX, nextY);
+        // Dashing still lands on slabs — that is the footing. Only pillars give way.
+        let hitObj = dashing ? dashLandingCollision(catX, nextY) : checkSolidCollision(catX, nextY);
 
         if (hitObj) {
             if (velocityY < 0) {

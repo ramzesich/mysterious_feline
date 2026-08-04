@@ -487,13 +487,28 @@ What tier 1 pointedly does **not** do — and this is the whole shape of the des
 
 So tier 1 makes him invincible to *things* without letting him ignore the level.
 
-**Tier 2 — hold `Shift`.** The dash, unchanged: `isDashing()` (catnip mode plus `Shift`) is 4× speed
-and suspends the level itself — horizontal and airborne solid collision are both skipped, pits are
-treated as whole ground, and pillars are destroyed on contact too. The checkpoint portal, snacks and
-the goal are all overlap-only, so they keep working at dash speed.
+**Tier 2 — hold `Shift`.** The dash: `isDashing()` (catnip mode plus `Shift`) is 4× speed, and
+geometry splits into two kinds. This split is load-bearing, and the reason is level 2:
+
+- **Pillars are obstacles** and lose — destroyed rather than collided with, by `smashPillarsAt()` on
+  the horizontal step and `dashLandingCollision()` on the way down.
+- **Slabs (platforms and movers) are footing.** He is too fast to be stopped *sideways* by one, but
+  he still **lands on top** of one.
+
+The dash used to skip vertical collision as well, which was harmless in level 1 — the only thing
+under you there is the ground — and fatal in level 2, where the ledges *are* the ground: holding
+`Shift` dropped him through every one of them to his death. Don't reintroduce it.
+
+Pits are still treated as whole ground while dashing, so level 1's 4× run crosses the alleys. The
+checkpoint portal, snacks and the goal are all overlap-only, so they keep working at dash speed.
 
 Note the one thing a `lethalFloor` does not yield to even here: there is nothing below the street to
 drop through, so the dash does not save him from it.
+
+Residual worth knowing: at 4× a walk-off carries him ~4× as far sideways, so in level 2 he pins
+against the far wall and lands on whichever ledges are on *that* wall, skipping the ones opposite.
+Holding a single direction the whole way down can therefore still miss a wall's worth of ledges and
+fall out of frame. Steering with the drops descends the whole level safely.
 
 While active, Bumbot's outline turns catnip-green and the HUD shows `🌿 CATNIP` plus a hint line
 naming both tiers. The hint exists because the mode was previously undiscoverable — the green outline
