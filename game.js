@@ -35,6 +35,7 @@ let worldWidth = level.worldWidth;
 let worldHeight = level.worldHeight || level.frame.height;
 let isVertical = level.axis === 'vertical';
 let winX = worldWidth - winInset;
+let appliedTheme = null; // The theme-<name> class currently on #gameWindow, so it can be swapped out
 
 const keys = { ArrowLeft: false, ArrowRight: false, ArrowUp: false, Space: false };
 
@@ -230,6 +231,9 @@ window.addEventListener('keydown', (e) => {
     }
 
     if (!gameActive) return;
+    // The scripted arrival owns the controls until it finishes, so a player mashing keys during the
+    // roof drop cannot steer it into a miss.
+    if (introHold) return;
     if (e.key === 'ArrowLeft' || e.key === 'ArrowRight' || e.key === 'ArrowUp' || e.code === 'Space') {
         e.preventDefault();
         const keyName = e.code === 'Space' ? 'Space' : e.key;
@@ -270,6 +274,27 @@ function rooftopVariant(obj) {
     return 'stack';
 }
 
+// --- Themes. Every level declares one, and it decides how shared furniture is *drawn*.
+//
+// This is deliberately separate from `axis`. The axis is a mechanic — which way the camera scrolls,
+// how the level is won, whether the floor is lethal. The theme is presentation. Deriving artwork
+// from the axis would mean a future vertical level in some other setting silently inheriting this
+// one's brickwork and sash windows, so the two must never be conflated: **key look on theme, key
+// behaviour on axis.**
+//
+// A theme supplies defaults only. Any entity can still name its own `variant` and win, exactly as a
+// pillar does, which is how level 2's rooftop vent pipe survives inside a masonry-fronted level.
+const THEME_ART = {
+    rooftops: { portal: 'pipe' },   // Level 1: a vent pipe on a roof deck
+    facade:   { portal: 'window' }  // Level 2: a sash window shoved up, in a wall
+};
+
+function portalArt(obj) {
+    if (obj.variant) return obj.variant;
+    const theme = THEME_ART[level.theme];
+    return (theme && theme.portal) || 'pipe';
+}
+
 // A pit is only fatal once Bumbot's centre is past its edge, which keeps the edges
 // forgiving rather than making a 1px overhang deadly.
 function isOverSolidGround(x) {
@@ -291,9 +316,16 @@ function applyLevelGeometry() {
     // The bar is fused to the window as one frame, so it has to match the window's OUTER width:
     // 4px of border on each side, same as the 708px the stylesheet hardcoded for level 1.
     instructionsBar.style.width = (windowWidth + 8) + 'px';
-    // Lets the stylesheet reshape anything that only makes sense in one orientation — the
-    // skyline layers, for one, sit on the horizon of a landscape frame and nowhere in a portrait.
-    gameWindow.classList.toggle('vertical-level', isVertical);
+
+    // Two independent hooks for the stylesheet, and keeping them separate is the point:
+    //   theme-<name>  — how this level LOOKS. Walls, skyline, materials. Never derive this from the
+    //                   axis; see THEME_ART.
+    //   narrow-frame  — how much ROOM there is. Purely a function of frame width, so overlay type
+    //                   can shrink without pretending to know anything about the setting.
+    if (appliedTheme) gameWindow.classList.remove(appliedTheme);
+    appliedTheme = 'theme-' + (level.theme || 'rooftops');
+    gameWindow.classList.add(appliedTheme);
+    gameWindow.classList.toggle('narrow-frame', windowWidth < 500);
 
     world.style.width = worldWidth + 'px';
 
@@ -396,6 +428,26 @@ function checkpointRespawn(obj) {
     return { x: obj.x + 14, y: 0 };
 }
 
+// The buildings either side, for a level that declares them. They live in #world and scroll rather
+// than being painted on the frame, because **a wall has to be able to end somewhere**: level 2's left
+// building stops at the roof deck Bumbot starts on, and that patch of open sky above his head is the
+// only thing that makes the opening read as "off a rooftop" instead of "off another ledge". Painted
+// on the frame they ran the full height forever, which stacked three storeys of masonry on top of
+// the roof he was supposed to be standing on.
+function buildWalls() {
+    if (!level.walls) return;
+    level.walls.forEach(w => {
+        const el = document.createElement('div');
+        el.classList.add('facade-wall', 'facade-wall-' + w.side, 'level-entity');
+        el.style.width = w.width + 'px';
+        el.style.height = w.top + 'px'; // Runs from the street up to the building's top
+        el.style.bottom = '40px';       // The usual 40 + y convention, with y = 0
+        if (w.side === 'left') el.style.left = '0px';
+        else el.style.right = '0px';
+        world.appendChild(el);
+    });
+}
+
 function generateLevel() {
     // Everything generated per level carries .level-entity, so clearing never depends on
     // an up-to-date list of type classes — and never touches the static goal feeder,
@@ -409,6 +461,7 @@ function generateLevel() {
     meowBubble.innerText = "I am Bumbot!!!";
 
     buildTerrain();
+    buildWalls(); // Before the objects, so the ledges paint in front of the masonry
 
     // A vertical level's goal is a window in the wall, so it is drawn as an entity rather than
     // being the static #goalFeeder that applyLevelGeometry parks at the end of a horizontal level.
@@ -457,9 +510,11 @@ function generateLevel() {
             element.style.left = obj.x + 'px';
             element.style.bottom = (40 + obj.height) + 'px';
         } else if (obj.type === 'portal' || obj.type === 'pipe') {
-            // Both are the same vent pipe. The checkpoint lights up when reached; a plain
-            // 'pipe' is scenery that Bumbot climbs out of and is lit from the start.
-            element.classList.add('vent-pipe'); // Drawn entirely in CSS, no glyph
+            // The same checkpoint in whatever the level's theme makes it: a vent pipe on a roof, a
+            // sash window in a wall. `variant` on the entity overrides, which is how level 2's roof
+            // keeps its pipe. Both light up cyan when reached, so "checkpoint" is the same colour in
+            // every level; the goal is the warm one.
+            element.classList.add(portalArt(obj) === 'window' ? 'sash-window' : 'vent-pipe');
             if (obj.type === 'pipe') element.classList.add('active');
             element.style.left = obj.x + 'px';
             // A vertical level's checkpoint is partway down a wall, so it needs a height. Level 1's
@@ -820,6 +875,7 @@ function handleOverlapSystems() {
             const spot = checkpointRespawn(obj);
             respawnX = spot.x;
             respawnY = spot.y;
+            respawnArrival = 'emerge'; // A checkpoint is a thing he squeezes out of, in any level
 
             meowBubble.innerText = "Checkpoint!";
             meowBubble.style.display = 'block';
@@ -980,7 +1036,7 @@ function triggerHurtReset(cause) {
         catContainer.style.left = catX + 'px';
         catContainer.style.bottom = (40 + catY) + 'px';
         applyCamera(); // Likewise the camera, or one frame renders at the old scroll position
-        playPipeEmerge();
+        playArrival(); // However this level (or its checkpoint) says he shows up
 
         // Re-engage main updating runtime loops loop
         gameActive = true;
@@ -993,6 +1049,49 @@ let activeDust = [];
 let wasInAirBefore = false; // Internal tracking state flag for gravity thresholds
 let idleFrames = 0;
 const idleThreshold = 180; // ~3 seconds of standing still before he settles
+
+// Every place Bumbot appears — the level opening and every respawn — he arrives somehow, and it is
+// not the same somehow in every level. Level 1 climbs out of a vent pipe; level 2 walks off a roof
+// and drops onto its first balcony. A checkpoint always emerges, whatever the level says, because a
+// checkpoint is by definition a thing he squeezes out of.
+//
+// `respawnArrival` tracks which one the *current* respawn point uses, so dying before level 2's
+// checkpoint replays the roof drop and dying after it climbs out of the window.
+let respawnArrival = 'emerge';
+
+// The scripted roof drop. Not a CSS animation: it is the real physics engine with the player's hands
+// tied, so he lands wherever collision actually puts him rather than wherever a keyframe guessed.
+// introHold locks input; the drop ends the moment he is grounded below where he started.
+let introHold = false;
+let introDir = 'right';
+let introFromY = 0;
+
+function playArrival() {
+    if (respawnArrival === 'drop') {
+        introHold = true;
+        introDir = level.arrivalDir || 'right';
+        introFromY = catY;
+        keys.ArrowLeft = false; keys.ArrowRight = false;
+        keys.ArrowUp = false; keys.Space = false;
+        return;
+    }
+    if (respawnArrival === 'emerge') playPipeEmerge();
+    // 'stand' does nothing at all: he is simply already there.
+}
+
+// Drives the scripted arrival. Called at the top of stepPhysics, before player input is read, and
+// checks for the landing *before* re-forcing the key so he does not take one extra step past it.
+function advanceIntro() {
+    if (!introHold) return;
+    if (isGrounded && catY < introFromY - 1) {
+        introHold = false;
+        keys.ArrowLeft = false;
+        keys.ArrowRight = false;
+        return;
+    }
+    keys.ArrowLeft = (introDir === 'left');
+    keys.ArrowRight = (introDir === 'right');
+}
 
 // Restarting a CSS animation needs the class gone and a reflow forced in between,
 // otherwise a second jump in quick succession would not replay the squash.
@@ -1035,6 +1134,9 @@ function createLandingDust(originX, originY) {
 function stepPhysics(dt) {
     // 0. Move the platforms before the player, so a passenger rides along cleanly
     updateMovers(dt);
+
+    // 0b. The scripted arrival drives the controls while it lasts, ahead of reading them below
+    advanceIntro();
 
     // Catnip rush. 4x of 7px is 28px per slice, still under the 40px pillar width, so sprinting
     // cannot tunnel past a solid between checks. Slabs do not block him sideways at this speed;
@@ -1297,6 +1399,8 @@ function loadLevel(index) {
     // A fresh run starts without the checkpoint
     respawnX = level.spawnX;
     respawnY = spawnY;
+    respawnArrival = level.arrival || 'emerge';
+    introHold = false; // Any arrival still in flight from the last level is abandoned
     snacks = 1; // Restores the one snack Bumbot always starts a run with
     gameActive = true;
     lastFrameTime = 0; // However long the win screen was up, it is not a game frame
@@ -1323,7 +1427,7 @@ function loadLevel(index) {
     catContainer.style.left = catX + 'px';
     catContainer.style.bottom = (40 + catY) + 'px';
     applyCamera();
-    playPipeEmerge(); // Every level opens with him climbing out of something
+    playArrival(); // Out of a pipe, off a roof, or already standing there — the level decides
     scheduleFrame();
 }
 

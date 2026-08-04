@@ -27,6 +27,7 @@
 const LEVEL_1 = {
     id: 'neon-outskirts',
     name: 'Neon Outskirts',
+    theme: 'rooftops', // Decides how shared furniture is drawn — see THEME_ART in game.js
     frame: { width: 700, height: 350 },
     axis: 'horizontal',
     worldWidth: 16000,

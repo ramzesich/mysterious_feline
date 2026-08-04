@@ -20,14 +20,25 @@
 // --- The schema ---------------------------------------------------------------------------
 // Shared by every level:
 //   id, name      — the slug and the display name shown on the win screen.
+//   theme         — how the level LOOKS. Becomes a `theme-<name>` class on #gameWindow, and picks
+//                   the artwork for shared furniture via THEME_ART in game.js. Current themes:
+//                   'rooftops' (level 1) and 'facade' (level 2).
+//                   **Never derive artwork from `axis` instead.** The axis is a mechanic and the
+//                   theme is presentation; conflating them means the next vertical level silently
+//                   inherits level 2's brickwork and sash windows. Each level gets its own look.
 //   frame         — { width, height } of the game window while this level is loaded. Levels are
 //                   not all the same shape; applyLevelGeometry() resizes #gameWindow and the
-//                   instructions bar to match.
+//                   instructions bar to match, and adds `narrow-frame` below 500px wide.
 //   axis          — 'horizontal' or 'vertical'. Decides which way the camera scrolls and how
 //                   the level is won. See below.
 //   worldWidth    — the world's width in px.
 //   spawnX        — where Bumbot starts, and where he respawns until a checkpoint is passed.
 //   pits          — [{ x, width }] lethal gaps in the floor. May be empty.
+//   arrival       — how Bumbot shows up at the level's own spawn: 'emerge' (climbs out of the
+//                   pipe/window there, the default), 'drop' (walks off and falls onto the first
+//                   ledge with input locked — level 2's opening), or 'stand' (already there).
+//                   A checkpoint always overrides this with 'emerge'. 'drop' also reads
+//                   `arrivalDir` ('left' | 'right') for which way to step off.
 //   objects       — the level. See "Entity model" in CLAUDE.md for the types.
 //   birds         — the wildlife. `axis` picks species and behaviour together.
 //

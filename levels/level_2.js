@@ -39,6 +39,7 @@
 const LEVEL_2 = {
     id: 'the-long-way-down',
     name: 'The Long Way Down',
+    theme: 'facade', // Old masonry seen from outside — see THEME_ART in game.js
     frame: { width: 400, height: 620 },
     axis: 'vertical',
     worldWidth: 400,
@@ -47,7 +48,14 @@ const LEVEL_2 = {
     // frame with nothing visible above — which reads as broken rather than as high up.
     worldHeight: 4450,
     spawnX: 40,
-    spawnY: 4110,      // Standing on the roof ledge below, which tops out at 4095 + 15
+    spawnY: 4110,      // Standing on the roof below, which tops out at 4095 + 15
+    // How he arrives, in place of level 1's climb out of a vent pipe. 'drop' walks him off the roof
+    // and down onto the first balcony on its own, with player input locked until he lands — that
+    // opening jump IS this level's arrival animation, and gameplay starts when it finishes.
+    // A checkpoint always overrides this with 'emerge', because a checkpoint is by definition a
+    // thing he squeezes out of.
+    arrival: 'drop',
+    arrivalDir: 'right', // Which way off the roof the first balcony lies
     lethalFloor: true, // The street at y=0 kills; there is no safe ground in this level
     pits: [],          // No alleys: the whole level is the gap between two buildings
 
@@ -55,9 +63,23 @@ const LEVEL_2 = {
     // the level is a drop *into* it rather than onto another balcony. Miss and the street has him.
     goal: { x: 0, y: 100, width: 110, height: 100 },
 
+    // The two buildings, and they are deliberately NOT the same height OR the same width — which is
+    // most of what makes the opening read as a rooftop. The LEFT one is narrower and ENDS at the roof
+    // deck he starts on, so there is open sky above his head; the RIGHT one is wider and carries on
+    // past the top of the frame. They live in #world and scroll, because a wall painted on the frame
+    // can never end anywhere, and a roof with three more storeys stacked on top of it is not a roof.
+    walls: [
+        { side: 'left', width: 110, top: 4110 },  // Flush with the roof deck's surface
+        { side: 'right', width: 130, top: 4450 }  // The full height of the world: no visible top
+    ],
+
     objects: [
-        // === The roof he arrives on, wide and safe. The level opens with him stepping off it.
-        { type: 'platform', x: 0, width: 190, height: 4095, side: 'left', variant: 'balcony' },
+        // === The roof he arrives on, straight off the end of level 1. Only as wide as its own
+        // building (110) — smaller than any balcony below it, and flush rather than cantilevered,
+        // because it is the top of the building rather than something bolted to its face. The
+        // balconies further down are wider than this and overhang their wall, which is the contrast
+        // that makes them read as balconies. The arrival walks him off it automatically.
+        { type: 'platform', x: 0, width: 110, height: 4095, side: 'left', variant: 'roof' },
 
         // === Upper storeys: gentle, to teach that walking off the lip is the whole verb. Drops
         // 150 / 205 / 135.

@@ -21,42 +21,74 @@ body {
     border-radius: 10px 10px 0 0; /* The instructions bar rounds off the bottom */
     overflow: hidden;
 }
-/* A vertical level looks down a gap between two buildings, so the horizon layers have nowhere to
-   sit — they are a landscape frame's skyline, anchored to a ground line this level does not have.
-   The walls and the street replace them. */
-#gameWindow.vertical-level #farBuildings,
-#gameWindow.vertical-level #nearBuildings {
+/* The facade theme looks down a gap between two buildings, so the horizon layers have nowhere to
+   sit — they are a skyline anchored to a ground line this setting does not have. The walls and the
+   street replace them. Keyed on the THEME, not on the axis: a future vertical level somewhere else
+   would want its own backdrop, not this one's. */
+#gameWindow.theme-facade #farBuildings,
+#gameWindow.theme-facade #nearBuildings {
     display: none;
 }
-/* The two building faces Bumbot bounces between. Painted on the frame rather than in #world
-   because they are the same all the way down, so there is nothing to scroll — the ledges moving
-   past them is what sells the descent. 130px each, which is why a ledge reaching 140px out from
-   the wall looks bolted to it rather than floating in front of it. */
-#gameWindow.vertical-level::before,
-#gameWindow.vertical-level::after {
-    content: '';
+/* What is actually in the gap: depth. #skyBg's default is a violet radial meant to be a *sky* behind
+   a skyline, and between two walls it read as a bright purple column — the single brightest thing on
+   screen, in the one place nothing should draw the eye. Down here it is the far side of the street,
+   most of it in shadow, with the city's glow spilling in at the top and sodium light a long way
+   below. Deliberately the darkest surface in the level so the lit ledges and the way out carry. */
+#gameWindow.theme-facade #skyBg {
+    background:
+        /* Haze where the alley opens to the sky, and the street glow at the bottom of it */
+        linear-gradient(rgba(96, 76, 150, 0.16) 0%, transparent 26%),
+        radial-gradient(ellipse 90% 22% at 50% 100%, rgba(255, 158, 62, 0.13), transparent 72%),
+        linear-gradient(#0a0813 0%, #0b0916 48%, #120d17 100%);
+}
+/* The two building faces Bumbot bounces between. Generated per level into #world by buildWalls(),
+   NOT painted on the frame — see that function for why. The consequence worth knowing: they scroll,
+   so the staining below drifts past as he descends, and each wall stops at its own building's top.
+
+   NO VERTICAL LINES. The first cut had damp streaks running down the face on top of the masonry
+   courses, and the two crossed into an even grid — the wall read as graph paper or bathroom tile.
+   Structure here comes from irregular courses plus hand-placed staining, on a tall cycle, the same
+   way .ground-segment scatters its gravel. Same rule as a pillar's face in level 1, in both axes. */
+.theme-facade .facade-wall {
     position: absolute;
-    top: 0;
-    bottom: 0;
-    width: 130px;
-    z-index: 4;
+    /* MUST stay behind the ledges. This was `z-index: 1`, and since ledges are `z-index: auto` that
+       painted the masonry in FRONT of them — every balcony vanished except the few px that stuck out
+       past the wall, leaving Bumbot standing on thin air. Walls are the backmost thing in #world;
+       .ledge claims 2 explicitly rather than trusting DOM order. */
+    z-index: 0;
     pointer-events: none;
     background:
-        /* Window rows, on a tall irregular cycle so the wall never reads as graph paper */
+        /* Hand-placed damp and soot, on a 260px cycle so no two stretches of wall match */
+        radial-gradient(ellipse 34px 20px at 22px 38px, rgba(0, 0, 0, 0.30), transparent 70%),
+        radial-gradient(ellipse 26px 44px at 96px 104px, rgba(0, 0, 0, 0.26), transparent 72%),
+        radial-gradient(ellipse 40px 16px at 58px 176px, rgba(0, 0, 0, 0.22), transparent 70%),
+        radial-gradient(ellipse 20px 30px at 12px 232px, rgba(126, 108, 84, 0.10), transparent 72%),
+        /* Courses of brick, uneven so the rhythm never locks up */
         repeating-linear-gradient(0deg,
-            transparent 0 26px, rgba(255, 196, 92, 0.05) 26px 54px, transparent 54px 92px,
-            rgba(160, 190, 235, 0.04) 92px 118px, transparent 118px 185px),
-        /* Courses of masonry, irregular for the same reason */
-        repeating-linear-gradient(0deg,
-            rgba(0, 0, 0, 0.20) 0 1px, transparent 1px 37px,
-            rgba(0, 0, 0, 0.14) 37px 38px, transparent 38px 79px),
-        linear-gradient(90deg, #1b1a22 0%, #141319 60%, #0d0c11 100%);
+            rgba(0, 0, 0, 0.26) 0 1px, transparent 1px 34px,
+            rgba(0, 0, 0, 0.17) 34px 35px, transparent 35px 71px,
+            rgba(0, 0, 0, 0.22) 71px 72px, transparent 72px 121px),
+        /* The face itself, falling away hard towards the middle of the gap */
+        linear-gradient(90deg, #2a2529 0%, #201c22 44%, #14111a 82%, #0c0a11 100%);
+    background-size: 260px 260px, 260px 260px, 260px 260px, 260px 260px, 100% 121px, 100% 100%;
+    background-repeat: repeat, repeat, repeat, repeat, repeat-y, no-repeat;
 }
-#gameWindow.vertical-level::before { left: 0; }
-#gameWindow.vertical-level::after {
-    right: 0;
-    /* Mirrored, so the light falls off towards the middle of the gap on both sides */
-    transform: scaleX(-1);
+/* Mirrored, so the light falls off towards the middle of the gap on both sides */
+.theme-facade .facade-wall-right { transform: scaleX(-1); }
+/* The building's own parapet, capping the wall where it ends. On the left building that top edge is
+   on screen at the start of the level and is the thing that says "this is as high as it goes"; on the
+   right building it sits above the frame and is never seen. Same amber danger line as level 1's
+   rooftop parapets, because it is the same object. */
+.theme-facade .facade-wall::before {
+    content: '';
+    position: absolute;
+    left: -4px;
+    right: -4px;
+    top: -8px;
+    height: 8px;
+    background: linear-gradient(#6b665c 0 2px, #514d46 2px 5px, #3a3732 5px 100%);
+    border-top: 1px solid rgba(255, 159, 28, 0.5);
+    box-sizing: border-box;
 }
 #ui {
     position: absolute;
@@ -850,8 +882,9 @@ body {
     line-height: 1.25;
 }
 /* 20 monospace characters of "MISSION ACCOMPLISHED" is ~12 * the font size, so a 400px frame minus
-   its padding needs about this to keep the title on one line. */
-#gameWindow.vertical-level #winScreen h1 {
+   its padding needs about this to keep the title on one line. Keyed on frame width rather than on
+   the axis or the theme: this is about how much room there is, nothing else. */
+#gameWindow.narrow-frame #winScreen h1 {
     font-size: 22px;
 }
 #finalScore {
@@ -1301,49 +1334,248 @@ button.secondary:hover { background: #1b1e2c; color: #aab3c4; }
 /* A ledge growing out of a wall. Declared after .platform so it wins on equal specificity, which
    is how it replaces both the blue safety edge (that is level 1's "static platform" cue and means
    nothing here) and the under-truss/support-legs pseudo-elements, which read as scaffolding rather
-   than as masonry bolted to a building. */
+   than as masonry bolted to a building.
+
+   The two pseudo-elements are budgeted, and every variant respects the split:
+     ::before  — everything ABOVE the slab (railing, window, canopy). Never collides.
+     ::after   — everything BELOW it (corbels, a gargoyle's head, awning struts).
+   Only the 15px slab is solid, so nothing either pseudo-element draws may look like footing or like
+   a wall — the same trap .platform's support legs had to avoid in level 1. */
 .ledge {
+    /* Explicit, so a ledge is never at the mercy of DOM order against the wall behind it */
+    z-index: 2;
     background:
-        radial-gradient(circle at 28% 45%, rgba(255, 255, 255, 0.06) 0 2px, transparent 2px),
-        radial-gradient(circle at 71% 62%, rgba(0, 0, 0, 0.20) 0 2px, transparent 2px),
-        linear-gradient(#6d6558 0%, #574f45 42%, #38332c 100%);
-    border: 1px solid #2a2621;
-    border-top: 3px solid #7e7566; /* Weathered stone, lit from above */
-    box-shadow: inset 0 -4px 7px rgba(0, 0, 0, 0.35);
+        radial-gradient(circle at 28% 62%, rgba(255, 255, 255, 0.05) 0 2px, transparent 2px),
+        radial-gradient(circle at 71% 74%, rgba(0, 0, 0, 0.22) 0 2px, transparent 2px),
+        /* Read top to bottom as: lit top surface, then the front face of the stone in shadow. The
+           first cut was one smooth olive gradient and read as a wooden plank — a 15px slab only
+           looks like stone if you can see its thickness. */
+        linear-gradient(#9a9284 0 4px, #7b7365 4px 7px, #5c554a 7px 11px, #423c34 11px 100%);
+    border: 1px solid #26221d;
+    border-top: 2px solid #b3aa9a; /* Weathered limestone, catching the city from above */
+    box-shadow: inset 0 -3px 6px rgba(0, 0, 0, 0.45);
 }
-/* Corbels: the stone brackets holding the ledge up. Two of them, tucked under the end nearest the
-   wall, tapering away from it — which is what makes a slab read as cantilevered out of masonry. */
+/* Corbels: the stone brackets holding a ledge up, tapering away from the wall — which is what makes
+   a slab read as cantilevered out of masonry rather than floating in front of it. Darker than the
+   slab, because it is the underside.
+   Both sides state `left` AND `right` explicitly: with only one of them set, the other stays `auto`
+   and the bracket falls back to its static position — the left-hand edge — which put every
+   right-hand ledge's bracket at the end away from its own wall. */
 .ledge::after {
     content: '';
     position: absolute;
     top: 100%;
-    width: 34%;
-    height: 15px;
-    background: linear-gradient(#4e473d 0%, #332e28 100%);
-    clip-path: polygon(0% 0%, 100% 0%, 62% 100%, 0% 100%);
+    left: 0;
+    right: auto;
+    width: 38%;
+    height: 16px;
+    background: linear-gradient(#4a443a 0%, #2b2721 100%);
+    border-top: 1px solid rgba(190, 180, 162, 0.25); /* The joint where bracket meets slab */
+    box-sizing: border-box;
+    clip-path: polygon(0% 0%, 100% 0%, 58% 100%, 0% 100%);
 }
-.ledge::before {
+.ledge::before { content: none; } /* Variants opt in to a topside; a bare ledge has none */
+.ledge-left::after { left: 0; right: auto; }
+.ledge-right::after { left: auto; right: 0; transform: scaleX(-1); }
+
+/* --- Balcony: wrought-iron railing over the stone. The railing is the strongest "this is a
+   building someone lives in" cue in the level, and it is drawn above the slab so it can never be
+   mistaken for something to stand on.
+   Iron is LIGHTER than the wall behind it, not darker. The first cut used near-black on near-black
+   and simply did not exist on screen; a railing at night reads by the light along its top rail, the
+   same way Bumbot and the birds read by their rim light. */
+.ledge-balcony::before {
+    content: '';
+    position: absolute;
+    bottom: 100%;
+    left: 2px;
+    right: 2px;
+    height: 18px;
+    background:
+        /* Top rail: a bright edge over a solid bar. This is the line that carries the whole shape */
+        linear-gradient(rgba(255, 210, 160, 0.55) 0 1px, #6c6660 1px 3.5px, transparent 3.5px),
+        /* Mid rail, dimmer */
+        linear-gradient(transparent 0 10px, rgba(122, 116, 108, 0.85) 10px 11.5px, transparent 11.5px),
+        /* Balusters. Periodic is right here — real railings are evenly spaced */
+        repeating-linear-gradient(90deg, #55504b 0 2px, transparent 2px 11px);
+    filter: drop-shadow(0 1px 1px rgba(0, 0, 0, 0.8));
+}
+
+/* --- Gargoyle: a carved head on a short bracket, jutting out under the ledge. Replaces the plain
+   corbel entirely — this IS the support, and it is the one piece of the facade with a face. */
+.ledge-gargoyle::after {
     content: '';
     position: absolute;
     top: 100%;
-    width: 16%;
-    height: 9px;
-    background: linear-gradient(#453f36 0%, #2a2621 100%);
+    width: 46px;
+    height: 26px;
+    background:
+        /* Two sunken eyes and the dark of an open mouth, placed rather than patterned */
+        radial-gradient(circle 2.2px at 13px 8px, #0a090c 0 100%, transparent 100%),
+        radial-gradient(circle 2.2px at 24px 9px, #0a090c 0 100%, transparent 100%),
+        radial-gradient(ellipse 7px 3px at 12px 19px, #0d0c10 0 100%, transparent 100%),
+        /* Brow ridge catching the light, then the muzzle falling into shadow */
+        linear-gradient(#6b6355 0 4px, #574f44 4px 13px, #3a352d 13px 100%);
+    /* A blunt snout tapering down and away from the wall */
+    clip-path: polygon(0% 0%, 100% 0%, 88% 46%, 58% 100%, 8% 92%, 0% 55%);
+    filter: drop-shadow(0 2px 3px rgba(0, 0, 0, 0.6));
 }
-/* Which way the corbels taper depends on which wall the ledge grows from. */
-.ledge-left::after { left: 0; }
-.ledge-left::before { left: 42%; }
-.ledge-right::after { right: 0; transform: scaleX(-1); }
-.ledge-right::before { right: 42%; }
+.ledge-gargoyle.ledge-left::after { left: 0; }
+.ledge-gargoyle.ledge-right::after { right: 0; transform: scaleX(-1); }
 
-/* Variant tints, standing in for the real architecture until the art pass. Each one only shifts
-   the top edge, so the silhouette stays honest about where the 15px collision slab is. */
-.ledge-balcony { border-top-color: #8a8072; }
-.ledge-gargoyle { border-top-color: #6f6a7d; }
-.ledge-sill { border-top-color: #7d7466; }
+/* --- Sill: a window ledge, with the window itself above it. Dark glass, a mullion cross and a
+   little cold interior light — deliberately NOT the warm amber of the goal window, so the way out
+   stays the only warm thing below the roofline. */
+.ledge-sill::before {
+    content: '';
+    position: absolute;
+    bottom: 100%;
+    height: 44px;
+    width: 58px;
+    background:
+        /* Mullion cross */
+        linear-gradient(90deg, transparent 0 27px, #322c25 27px 30px, transparent 30px),
+        linear-gradient(transparent 0 19px, #322c25 19px 22px, transparent 22px),
+        /* A pane catching a reflection of the sky, and the room behind going dark */
+        linear-gradient(150deg, rgba(150, 178, 214, 0.16) 0 34%, transparent 34%),
+        linear-gradient(#1a1d24 0%, #10121a 100%);
+    border: 3px solid #4a4238;
+    border-bottom: none;
+    box-sizing: border-box;
+    box-shadow: inset 0 0 10px rgba(0, 0, 0, 0.7);
+}
+.ledge-sill.ledge-left::before { left: 8px; }
+.ledge-sill.ledge-right::before { right: 8px; }
+
+/* --- Awning: stretched canvas, and the one ledge that is not stone. The slab itself is the taut
+   fabric he lands on, so it gets the stripes; ::before is the shallow front valance and ::after the
+   thin struts back to the wall. Periodic stripes are correct here — awnings really are striped. */
 .ledge-awning {
-    border-top-color: #7a4a44;
-    background: linear-gradient(#7a4a44 0%, #5c3833 45%, #3a2420 100%);
+    background:
+        repeating-linear-gradient(90deg,
+            #8c4a42 0 14px, #6d3a34 14px 16px, #c9bfae 16px 30px, #a89d8c 30px 32px),
+        linear-gradient(rgba(255, 255, 255, 0.10), rgba(0, 0, 0, 0.45));
+    background-blend-mode: normal, multiply;
+    border: 1px solid #3a2723;
+    border-top: 3px solid #a5584e;
+    box-shadow: inset 0 -3px 6px rgba(0, 0, 0, 0.4);
+}
+/* Scalloped front edge, hanging just below the slab — decoration, and clearly too thin to stand on */
+.ledge-awning::before {
+    content: '';
+    position: absolute;
+    top: 100%;
+    left: 0;
+    right: 0;
+    height: 8px;
+    background: repeating-linear-gradient(90deg,
+        #7e423b 0 14px, #63332e 14px 16px, #b5ab9b 16px 30px, #978d7e 30px 32px);
+    -webkit-mask-image: repeating-radial-gradient(circle 8px at 8px 0, black 0 6.5px, transparent 6.5px 8px);
+    mask-image: repeating-radial-gradient(circle 8px at 8px 0, black 0 6.5px, transparent 6.5px 8px);
+    -webkit-mask-size: 16px 100%;
+    mask-size: 16px 100%;
+}
+/* Struts instead of corbels: canvas is held by ironwork, not stone brackets */
+.ledge-awning::after {
+    content: '';
+    position: absolute;
+    top: 100%;
+    width: 30px;
+    height: 22px;
+    background: linear-gradient(58deg, transparent 0 44%, rgba(28, 26, 30, 0.85) 44% 52%, transparent 52%);
+    clip-path: none;
+}
+.ledge-awning.ledge-left::after { left: 0; transform: none; }
+.ledge-awning.ledge-right::after { right: 0; transform: scaleX(-1); }
+
+/* --- Roof: where he arrives, straight off the end of level 1, so it borrows that level's material
+   language deliberately — gravel over felt seams, and a parapet coping on the outer edge. It is the
+   one ledge that is a *deck* rather than a thing bolted to a wall, and it should read as continuous
+   with the rooftops he just left. */
+.ledge-roof {
+    background:
+        /* Loose gravel, hand-placed on a 160px cycle exactly like .ground-segment's */
+        radial-gradient(circle 1.5px at 18px 5px, rgba(255, 255, 255, 0.14), transparent),
+        radial-gradient(circle 1.3px at 51px 8px, rgba(0, 0, 0, 0.32), transparent),
+        radial-gradient(circle 1.6px at 88px 4px, rgba(255, 255, 255, 0.10), transparent),
+        radial-gradient(circle 1.4px at 122px 9px, rgba(0, 0, 0, 0.26), transparent),
+        /* Felt seams, running with the roof */
+        repeating-linear-gradient(90deg, rgba(0, 0, 0, 0.24) 0 2px, transparent 2px 96px),
+        linear-gradient(#4a4741 0 5px, #2f2d29 5px 9px, #1b1a18 9px 100%);
+    background-size: 160px 100%, 160px 100%, 160px 100%, 160px 100%, 96px 100%, 100% 100%;
+    background-repeat: repeat-x;
+    border: 1px solid #26221d;
+    border-top: 3px solid #5b574f; /* The same coping cap level 1 is walked on */
+}
+/* No corbel: this is the top of a building sitting on its own wall, not a slab cantilevered off the
+   face of one. A bracket under it was a large part of why the roof read as just another ledge.
+   No coping either — the wall it caps carries its own parapet across the whole top now
+   (.facade-wall::before), and drawing a second one here put two stone caps in the same place. */
+.ledge-roof::after { content: none; }
+.ledge-roof::before { content: none; }
+
+/* --- The checkpoint, in the facade theme: a sash window shoved up, with a gap under it he squeezes
+   out of. Same two states as level 1's vent pipe and the same colour language — dim and colourless
+   until reached, cyan from inside once it is his respawn. game.js picks this drawing from the
+   level's theme (THEME_ART), never from its axis. */
+.sash-window {
+    position: absolute;
+    bottom: 40px;
+    width: 52px;
+    height: 66px;
+    opacity: 0.45;
+    filter: grayscale(1) brightness(0.7);
+    transition: opacity 0.4s ease-out, filter 0.4s ease-out;
+    z-index: 5; /* Behind Bumbot, like the vent pipe — he comes *out* of it */
+    box-sizing: border-box;
+    border: 3px solid #4a4238;
+    background:
+        /* The raised lower sash: its rail sits partway up, glass above it */
+        linear-gradient(#20242c 0 30px, #3b342c 30px 35px, transparent 35px),
+        /* The gap under the sash, where the room shows through */
+        linear-gradient(transparent 0 35px, #08070c 35px 100%),
+        /* Reflection across the upper pane */
+        linear-gradient(155deg, rgba(150, 178, 214, 0.14) 0 40%, transparent 40%);
+    box-shadow: inset 0 0 12px rgba(0, 0, 0, 0.8);
+}
+/* Stone surround: a lintel over the top and a sill under it, so the window sits IN the wall */
+.sash-window::before {
+    content: '';
+    position: absolute;
+    left: -5px;
+    right: -5px;
+    top: -7px;
+    height: 7px;
+    background: linear-gradient(#6f6657 0 3px, #4d453b 3px 100%);
+    box-shadow: 0 2px 3px rgba(0, 0, 0, 0.55);
+}
+.sash-window::after {
+    content: '';
+    position: absolute;
+    left: -6px;
+    right: -6px;
+    bottom: -6px;
+    height: 6px;
+    background: linear-gradient(#776d5d 0 2px, #514840 2px 100%);
+}
+.sash-window.active {
+    opacity: 1;
+    filter: none;
+}
+/* Lit from inside once it is the respawn, breathing slowly — the cyan is the checkpoint colour the
+   vent pipe already uses in level 1, so the two read as the same thing in different materials. */
+.sash-window.active {
+    background:
+        linear-gradient(#20242c 0 30px, #3b342c 30px 35px, transparent 35px),
+        linear-gradient(transparent 0 35px, rgba(0, 240, 255, 0.30) 35px 100%),
+        linear-gradient(155deg, rgba(150, 178, 214, 0.14) 0 40%, transparent 40%);
+    animation: sashGlow 2.6s ease-in-out infinite;
+}
+@keyframes sashGlow {
+    0%, 100% { box-shadow: inset 0 0 12px rgba(0, 0, 0, 0.8), inset 0 -10px 14px rgba(0, 240, 255, 0.35),
+                           0 0 10px rgba(0, 240, 255, 0.25); }
+    50% { box-shadow: inset 0 0 12px rgba(0, 0, 0, 0.8), inset 0 -14px 20px rgba(0, 240, 255, 0.55),
+                      0 0 18px rgba(0, 240, 255, 0.45); }
 }
 
 /* The way out: a half-open window on the second floor, lit warm from inside. The one friendly

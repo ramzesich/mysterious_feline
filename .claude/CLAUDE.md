@@ -72,7 +72,36 @@ For a horizontal level, end-of-level geometry is derived rather than hardcoded:
 `worldWidth - winInset`, so changing a level's length is a one-number edit. A vertical level instead
 names an explicit `goal` rect, because "the far right-hand edge" means nothing running downward.
 
-## Axis-dependent behaviour
+## Themes (look) vs axis (mechanics)
+
+**Every level has its own theme, and artwork must never be derived from the axis.** The axis is a
+mechanic — camera direction, win condition, whether the floor kills. The theme is presentation. They
+happen to correlate in the two levels that exist, which makes it tempting to key CSS off
+`isVertical`; don't. The next vertical level will be set somewhere else and would silently inherit
+level 2's brickwork and sash windows.
+
+Each level declares `theme`, and `applyLevelGeometry()` puts three things on `#gameWindow`:
+
+| Hook | Means | Example |
+|---|---|---|
+| `theme-<name>` | how it looks | `theme-facade` draws the two wall faces and hides the skyline layers |
+| `narrow-frame` | how much room there is (frame width < 500) | shrinks the win-screen title |
+| (inline width/height) | the frame itself, from `level.frame` | 700×350 vs 400×620 |
+
+`narrow-frame` is separate on purpose: overlay type shrinking is about available space, not about the
+setting or the direction of travel.
+
+Shared *furniture* resolves its artwork through `THEME_ART` in `game.js`, which maps a theme to
+default drawings — currently just the checkpoint (`rooftops` → vent pipe, `facade` → sash window).
+An entity can always override with its own `variant`, exactly as a `pillar` does; that is how level
+2's rooftop vent pipe survives inside a masonry-fronted level. Resolution happens in JS
+(`portalArt()`, mirroring `rooftopVariant()`) so each element gets exactly one drawing class, rather
+than the stylesheet fighting itself with `:not()` chains.
+
+Both checkpoints glow **cyan** whatever the theme, because that is the checkpoint colour language;
+the goal is the warm one. Keep that split — it is the only warm light below level 2's roofline, which
+is what makes the way out readable from a long way up.
+
 
 Everything that branches on `level.axis` lives in **six** places, and it is worth keeping it that
 way. If a seventh appears, that's the signal to split the engine per axis rather than keep threading
@@ -90,7 +119,38 @@ way. If a seventh appears, that's the signal to split the engine per axis rather
 Two things are driven by a **data flag** rather than the axis, deliberately, so a horizontal level
 could use them too: `level.lethalFloor` (touching `y = 0` kills) and `level.goal`.
 
-`isVertical` is recomputed in `applyLevelGeometry()`, so it is always in sync with `level`.
+`isVertical` is recomputed in `applyLevelGeometry()`, so it is always in sync with `level`. It governs
+*behaviour only* — see "Themes vs axis" above for why no stylesheet rule may key off it.
+
+## Level 2's architecture
+
+The facade is built from the same `platform` entity as level 1's catwalks — identical 15px collision
+slab — reskinned by `side` (which wall it grows from) and `variant` (what it is). `generateLevel()`
+adds `.ledge`, `.ledge-<side>` and `.ledge-<variant>`, declared *after* `.platform` so they win on
+equal specificity and replace both the blue safety edge and the truss/legs pseudo-elements.
+
+The two pseudo-elements are budgeted, and every variant respects the split:
+
+- **`::before` — everything above the slab.** Balcony railing, sill window, awning valance.
+- **`::after` — everything below it.** Stone corbels, the gargoyle's head, awning struts.
+
+Only the 15px slab is solid, so **nothing either pseudo-element draws may look like footing or like a
+wall** — the same trap level 1's support legs had to avoid.
+
+| Variant | What it is |
+|---|---|
+| `balcony` | Wrought-iron railing over stone. The strongest "someone lives here" cue in the level. |
+| `gargoyle` | A carved head on a short bracket, replacing the corbel — the one piece of the facade with a face. |
+| `sill` | A window ledge with the window above it: dark glass, mullion cross, cold interior light. |
+| `awning` | Stretched canvas, the only non-stone ledge. Striped slab, scalloped valance, iron struts. |
+
+Periodic pattern is *correct* for the railing balusters and the awning stripes — real railings and
+awnings are evenly spaced. That is the same distinction level 1 draws between a pillar's face (never
+periodic) and an AC unit's louvres (rightly periodic).
+
+The wall faces themselves carry **no window rows** on purpose: the sills and the two portals draw the
+windows, because they know where they actually are. Adding rows to the wall put them behind ledges at
+random offsets.
 
 ## Coordinate system (the main thing to get right)
 
@@ -377,10 +437,29 @@ Two reset paths, deliberately different:
   through it, and `handleWinButton` is called from an inline `onclick` in `index.html`, so it
   must stay a global function. It hand-draws its opening frame for the same reason the respawn does.
 
-Both end by calling `playPipeEmerge()`, because both spawn points have a `pipe`/`portal` in the
-level data and Bumbot always arrives by climbing out of one. That helper goes through
-`playBodyAnimation()`, so `cat-emerge` has to stay in that function's removal list or a second
-emerge won't replay.
+Both end by calling `playArrival()`, because Bumbot never simply blinks into existence — but *how* he
+arrives is per-level data, not a constant:
+
+| `level.arrival` | What happens | Used by |
+|---|---|---|
+| `'emerge'` (default) | `playPipeEmerge()` — climbs out of the pipe/window at the spawn | level 1 |
+| `'drop'` | Walks off the roof and falls onto the first ledge, **input locked**, then hands over | level 2 |
+| `'stand'` | Nothing. He is already there. | — |
+
+A **checkpoint always overrides this with `'emerge'`**, whatever the level says, because a checkpoint
+is by definition a thing he squeezes out of. `respawnArrival` tracks which one the *current* respawn
+point uses, so dying before level 2's checkpoint replays the roof drop and dying after it climbs out
+of the window.
+
+The roof drop (`'drop'`) is **not a CSS animation** — it is the real physics engine with the player's
+hands tied, so he lands wherever collision actually puts him rather than wherever a keyframe guessed.
+`introHold` locks input (checked in `keydown`, and `advanceIntro()` overwrites the key state each
+frame so a key already held cannot steer it), and it clears the moment he is grounded below where he
+started. Measured at ~0.70s for level 2. `advanceIntro()` runs at the top of `stepPhysics` *before*
+input is read, and tests for the landing before re-forcing the key, or he takes one extra step past it.
+
+`playPipeEmerge()` goes through `playBodyAnimation()`, so `cat-emerge` has to stay in that function's
+removal list or a second emerge won't replay.
 
 ## Winning (two sequences)
 
@@ -412,11 +491,23 @@ the camera simply never pans sideways — no special case is needed for that.
 
 Background layers scroll via `backgroundPositionX` on `#farBuildings` (0.15×) and
 `#nearBuildings` (0.40×) — they are `repeat-x` tiles, so they scroll infinitely. Don't
-translate those elements; that was the earlier broken approach. Both are **hidden** in a vertical
-level (`#gameWindow.vertical-level`): they are a skyline anchored to a horizon that level doesn't
-have. Its two wall faces are `#gameWindow.vertical-level::before/::after` — painted on the frame
-rather than in `#world`, because the masonry is identical all the way down, so there is nothing to
-scroll; the ledges moving past is what sells the descent.
+translate those elements; that was the earlier broken approach. Both are **hidden** in the facade
+theme: they are a skyline anchored to a horizon that setting doesn't have, and `#skyBg`'s violet
+radial is overridden there too — between two walls it read as a bright purple column, the brightest
+thing on screen in the one place nothing should draw the eye.
+
+The two wall faces are generated per level into `#world` by `buildWalls()` from `level.walls`
+(`{ side, width, top }`). They were originally painted on the frame as `::before`/`::after`, on the
+reasoning that the masonry is identical all the way down so there is nothing to scroll. That was
+wrong for one specific reason: **a wall painted on the frame can never end anywhere.** Level 2's left
+building has to stop at the roof deck Bumbot starts on — the patch of open sky above his head (291px
+of the 620px frame at spawn) is the only thing that makes the opening read as "off a rooftop" rather
+than "off another ledge". The right building deliberately runs past the top of the frame instead, so
+the two buildings are visibly different heights.
+
+Consequences: the walls scroll, so their staining drifts past as he descends; each carries a parapet
+coping at its own top (`.facade-wall::before`); and the roof deck is flush with its wall (130 wide,
+no overhang, no corbel) because it is the top of a building rather than a slab bolted to one.
 
 Each skyline layer is several gradient bands on **coprime tile widths** (900/700/1100 and
 820/1300/540) anchored with `background-position: 0 100%`, which is what keeps the city from
