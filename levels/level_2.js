@@ -70,7 +70,11 @@ const LEVEL_2 = {
     // can never end anywhere, and a roof with three more storeys stacked on top of it is not a roof.
     walls: [
         { side: 'left', width: 110, top: 4110 },  // Flush with the roof deck's surface
-        { side: 'right', width: 130, top: 4450 }  // The full height of the world: no visible top
+        // The full height of the world, so its own parapet sits above the frame and is never seen
+        // — but `roofEdge` plants a second, purely decorative cap at the same height as the left
+        // roof, so the opening reads as two facing rooftops rather than one roof and one wall that
+        // just keeps going up.
+        { side: 'right', width: 130, top: 4450, roofEdge: 4110 }
     ],
 
     objects: [
@@ -89,6 +93,14 @@ const LEVEL_2 = {
 
         // === The first long one, onto a narrow sill. Drops 240 / 175 / 130.
         { type: 'platform', x: 0, width: 130, height: 3365, side: 'left', variant: 'gargoyle' },
+        // The disguised ledge: no `side`, so it renders as a bare catwalk slab rather than
+        // wall-grown stonework — reads as an old fire-escape landing strung between the two
+        // buildings, which is exactly period-correct for this alley. Holding right the whole way
+        // off the gargoyle (the fast, obvious line) never dips this low before x has already
+        // carried past it, so default play never touches it; only easing off right — or letting go
+        // to fall straighter — lands here. From it, awning is a trivial 10px reach with 55px of
+        // drop to spend, so there is no way to strand on it.
+        { type: 'platform', x: 170, width: 60, height: 3245, hidden: true },
         { type: 'platform', x: 240, width: 160, height: 3190, side: 'right', variant: 'awning' },
         { type: 'platform', x: 0, width: 120, height: 3060, side: 'left', variant: 'gargoyle' },
 
@@ -102,11 +114,18 @@ const LEVEL_2 = {
         // respawn from here on. Drops 235 / 165.
         { type: 'platform', x: 0, width: 120, height: 2265, side: 'left', variant: 'sill' },
         { type: 'platform', x: 230, width: 170, height: 2100, side: 'right', variant: 'balcony' },
-        { type: 'portal', x: 330, y: 2115 },
+        // `side` here isn't cosmetic like a ledge's — it's what tells the respawn which way is
+        // "back into the gap" so he doesn't climb out facing the bricks (see respawnFace in game.js).
+        { type: 'portal', x: 330, y: 2115, side: 'right' },
 
         // === Lower storeys, mixed rhythm. Drops 200 / 130 / 245 / 160 / 215 / 140.
         { type: 'platform', x: 0, width: 160, height: 1900, side: 'left', variant: 'balcony' },
         { type: 'platform', x: 250, width: 150, height: 1770, side: 'right', variant: 'sill' },
+        // The sweeper: mounted on the left wall he's already committed to by the time he's this
+        // close (the 245px drop off the sill is the longest horizontal traverse in the level), so
+        // she notices him mid-fall and is telegraphing before he lands rather than after. y sits
+        // 75px above the gargoyle ledge below so the telegraph has room to play out in the air.
+        { type: 'sweeper', x: 0, y: 1600, side: 'left' },
         { type: 'platform', x: 0, width: 130, height: 1525, side: 'left', variant: 'gargoyle' },
         { type: 'platform', x: 220, width: 180, height: 1365, side: 'right', variant: 'awning' },
         { type: 'platform', x: 0, width: 110, height: 1150, side: 'left', variant: 'gargoyle' },
@@ -121,14 +140,26 @@ const LEVEL_2 = {
         // and the street are both in shot — and the drop off this ledge goes through the window.
         { type: 'platform', x: 250, width: 150, height: 225, side: 'right', variant: 'balcony' },
 
-        // === Two snacks, each sitting on the fall line of a long drop, so they are collected in
-        // passing rather than sought out. Currently that makes them easy — earning them is what the
-        // disguised ledge is for, and that is still to come.
-        { type: 'snack', x: 205, height: 3300 },
+        // The first snack now sits over the disguised ledge above (3245-3260 slab), just above
+        // standing-reach height rather than on the default fall line, so grabbing it means finding
+        // the ledge rather than flying through it. The second is left on its fall line — one of the
+        // two stays "collected in passing" on purpose, so the level teaches the easy read before
+        // asking for the careful one.
+        { type: 'snack', x: 195, height: 3270 },
         { type: 'snack', x: 205, height: 1460 }
     ],
 
-    // The wildlife arrives with the hazard pass: a pigeon perched on a ledge turning its head,
-    // and the old lady with the broom.
-    birds: []
+    // The wildlife arrives with the hazard pass: a pigeon perched on a ledge turning its head
+    // (below), and the old lady with the broom (the `sweeper` object above, in `objects` rather
+    // than here — she's proximity-triggered rather than patrolling, so she's built like the
+    // portal/platform furniture instead of a bird).
+    //
+    // The pigeon sits on the third ledge — the tail end of the deliberately gentle intro run —
+    // parked at the far right of a 170px balcony (flush right wall, so x=350 is 50px from the
+    // edge). A plain walk-off from the sill above lands around x=269 holding right the whole way,
+    // so the default line touches down well clear of it; only drifting further right finds it.
+    // First hazard in the level, so it gets the widest possible margin for error.
+    birds: [
+        { x: 350, y: 3620, axis: 'walk', min: 350, max: 350, speed: 0, facing: 'left' }
+    ]
 };

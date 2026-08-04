@@ -256,11 +256,27 @@ record (`{...obj, dom, active}`); `level.birds` become `BirdEntities`.
 - `portal` — the mid-level checkpoint, overlap-only. `hasPassedCheckpoint()` decides when it counts
   and `checkpointRespawn()` where it puts you (both axis-dependent — see the table above); it then
   sets `respawnX`/`respawnY` and adds `.active`, which lights the pipe from inside. Optional `y`
-  mounts it partway up a wall, which is what a vertical level's checkpoint window needs.
+  mounts it partway up a wall, which is what a vertical level's checkpoint window needs. Optional
+  `side` (vertical levels only) says which wall it's set into, which `respawnFace` reads to face him
+  back into the gap on respawn — a checkpoint on the right wall has to send him back out facing
+  *left*, not level 1's blanket "face right."
 - `pipe` — the same `.vent-pipe` drawing as the portal, permanently `.active`, and pure
   scenery: absent from `isSolidType()`/`isSlabType()`, from the meow sweep and from
   `handleOverlapSystems()`. One sits at the level spawn so Bumbot's arrival matches his
   respawns.
+- `sweeper` — level 2's ambush hazard: an old woman who looks like a shuttered window
+  (`.sweeper`/`.sweeper-window`, same lintel-and-sill stone as `.sash-window`) until Bumbot enters
+  her proximity zone, then leans out and swats. `side` picks the wall exactly like a ledge's, and
+  which way the rig mirrors (`.sweeper-right .sweeper-rig { scaleX(-1) }`, the same one-drawing
+  trick a pigeon's `--wing` uses). Overlap-only and absent from `isSolidType()`, but unlike every
+  other hazard she runs her own **state machine** (`updateSweepers()`, called from `stepPhysics`
+  right after the birds): `idle` → (proximity) `telegraph` → `swing` (the only lethal state,
+  checked in `handleOverlapSystems()` against a reach rectangle extending `sweeperReach` out from
+  her wall) → `cooldown` → back to `idle`. Immune to Sonic Meow on purpose, same as pits and
+  movers — the meow sweep only ever tests `pillar`/`spike`, and a person is not a thing to blast
+  away with a sound wave. Tier 1 catnip contact does **not** delete her the way `shatterEntity`
+  deletes a pillar; it just forces her to `cooldown` early (a flinch, not a kill) — see Catnip
+  below for why every new hazard has to opt into that check by hand.
 
 The goal is not a level object in either level, but it is a different thing in each. A horizontal
 level's is the cat feeder (`#goalFeeder`), a **static** child of `#world` positioned by

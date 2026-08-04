@@ -48,6 +48,11 @@ let groundedOn = null; // The entity Bumbot is standing on, so movers can carry 
 // a window partway *down* — respawning at y=0 there would drop him on the lethal street.
 let respawnX = level.spawnX;
 let respawnY = level.spawnY || 0;
+// Which way he should face on arrival there. -1 is level 1's convention (out of the pipe, facing
+// the way he runs) and the right default everywhere except a vertical level's checkpoint, whose
+// window can be in either wall — facing has to point back into the gap, away from that wall, or
+// he arrives staring at the bricks he just squeezed out of.
+let respawnFace = -1;
 let snacks = 1; // Snacks in the pouch; each one powers exactly one Sonic Meow
 // The page now opens on the title card, so play does not begin until Start is pressed:
 // gameActive stays false and the loop is never started until then.
@@ -71,6 +76,18 @@ const fallDeathY = -80; // How far below the ground line a pit becomes fatal
 // The furthest Bumbot may fall within a single physics slice, in px. Must stay below the 15px slab
 // thickness or a fast fall tunnels straight through a ledge — see the slicing loop in update().
 const maxSliceTravel = 10;
+
+// The broom-sweeper (level 2): a window that looks shuttered until Bumbot is close, then leans an
+// old woman out to swat him off the wall. Dimensions match the window art in style.css (.sweeper).
+// Timers are in 60fps frames like everything else, so they scale with dt the same way.
+const sweeperWidth = 50;
+const sweeperHeight = 64;
+const sweeperReach = 55;      // How far the broom's lethal hitbox extends out from her own wall
+const sweeperDetectOut = 140; // How far into the gap the "notice him" zone reaches
+const sweeperDetectVPad = 40; // Vertical padding added above and below her window for detection
+const sweeperTelegraphFrames = 26; // ~0.43s: she leans into the opening, not yet lethal
+const sweeperSwingFrames = 16;     // ~0.27s: the broom is out and lethal
+const sweeperCooldownFrames = 60;  // ~1s retreated with the window shut before she can re-arm
 
 const frameMs = 1000 / 60;  // Reference frame duration that the constants above assume
 const maxCatchUpFrames = 4; // Ceiling on dt so a stall can't teleport Bumbot across the map
@@ -445,6 +462,21 @@ function buildWalls() {
         if (w.side === 'left') el.style.left = '0px';
         else el.style.right = '0px';
         world.appendChild(el);
+
+        // An optional second roofline, below the wall's own top. The right building in level 2
+        // genuinely is taller — its own parapet (`::before`, at `w.top`) still sits above the frame
+        // and is never seen — but it also wants to read as an ordinary rooftop at the height Bumbot
+        // actually starts from, so the opening shows two facing roofs instead of one roof and one
+        // wall that just keeps going.
+        if (w.roofEdge != null) {
+            const edge = document.createElement('div');
+            edge.classList.add('facade-roof-edge', 'level-entity');
+            edge.style.width = w.width + 'px';
+            edge.style.bottom = (40 + w.roofEdge) + 'px';
+            if (w.side === 'left') edge.style.left = '0px';
+            else edge.style.right = '0px';
+            world.appendChild(edge);
+        }
     });
 }
 
@@ -520,6 +552,23 @@ function generateLevel() {
             // A vertical level's checkpoint is partway down a wall, so it needs a height. Level 1's
             // sit on the deck and omit y, which is why this falls back to 0.
             element.style.bottom = (40 + (obj.y || 0)) + 'px';
+        } else if (obj.type === 'sweeper') {
+            // A window that looks shuttered until Bumbot gets close, then leans an old woman and
+            // her broom out of it. `side` says which wall — and which way the broom swings, into
+            // the gap rather than into the bricks — the same wall-facing convention a ledge uses.
+            element.classList.add('sweeper', 'sweeper-' + obj.side);
+            element.style.left = obj.x + 'px';
+            element.style.bottom = (40 + obj.y) + 'px';
+            // .sweeper-mask is a sibling of the window, not a wrapper around it, so it can clip
+            // the figure without also clipping the window's own overhanging lintel/sill.
+            element.innerHTML =
+                '<div class="sweeper-window"></div>' +
+                '<div class="sweeper-mask">' +
+                    '<div class="sweeper-rig">' +
+                        '<div class="sweeper-body"></div>' +
+                        '<div class="sweeper-arm"><div class="sweeper-broom"></div></div>' +
+                    '</div>' +
+                '</div>';
         }
 
         world.appendChild(element);
@@ -531,6 +580,12 @@ function generateLevel() {
             entity.baseHeight = obj.height;
             entity.dir = 1;
         }
+        if (obj.type === 'sweeper') {
+            // idle -> telegraph (she leans out) -> swing (lethal) -> cooldown (retreats, can't
+            // re-arm yet) -> idle. See updateSweepers() for the timings.
+            entity.state = 'idle';
+            entity.timer = 0;
+        }
         RuntimeEntities.push(entity);
     });
 
@@ -540,7 +595,13 @@ function generateLevel() {
         // deck on foot, crows are the ones working the air. The class carries the species so the
         // stylesheet can light each one its own way.
         const walker = pig.axis === 'walk';
+        // A perched pigeon is a walker with nowhere to walk (min === max): still lethal on contact,
+        // just standing its ground rather than patrolling it. Caught here rather than left for the
+        // update loop, because a zero-range patrol would otherwise sit exactly on its own clamp and
+        // flip `dir` — and therefore `--wing`, which mirrors the sprite — every single frame.
+        const perched = walker && pig.min === pig.max;
         element.classList.add('bird', walker ? 'pigeon' : 'crow', 'level-entity');
+        if (perched) element.classList.add('perched');
         // Both species are drawn sprites now, cloned per bird from the templates at the bottom of
         // index.html. Their parts carry classes rather than ids, so any number can coexist.
         element.appendChild((walker ? pigeonSprite : crowSprite).content.cloneNode(true));
@@ -548,13 +609,16 @@ function generateLevel() {
         // Same ground-relative convention as every other entity, and the same one the collision
         // check below already assumed — birds used to render 40px below their own hitbox.
         element.style.bottom = (40 + pig.y) + 'px';
+        // A patrolling walker gets its facing from the update loop once it first moves; a perched
+        // one never moves, so it has to be set once here instead, from the data's `facing`.
+        if (perched) element.style.setProperty('--wing', pig.facing === 'left' ? 1 : -1);
         world.appendChild(element);
 
         BirdEntities.push({
             dom: element, x: pig.x, y: pig.y,
             axis: pig.axis || 'x',
             min: pig.min, max: pig.max,
-            speed: pig.speed || 2, dir: 1, active: true
+            speed: pig.speed || 2, dir: 1, active: true, perched
         });
     });
 }
@@ -807,6 +871,48 @@ function updateMovers(dt) {
     });
 }
 
+// The broom-sweeper's state machine: idle -> telegraph -> swing -> cooldown -> idle. Proximity
+// only matters from `idle` — once she has noticed him the sequence runs to completion on its own,
+// so ducking back out of range mid-swing doesn't save him (the broom is already out) but does stop
+// her ever re-triggering while he's still standing right there.
+function updateSweepers(dt) {
+    RuntimeEntities.forEach(obj => {
+        if (obj.type !== 'sweeper' || !obj.active) return;
+
+        if (obj.state === 'idle') {
+            const out = obj.side === 'left' ? obj.x + sweeperDetectOut : obj.x - sweeperDetectOut;
+            const zoneLeft = Math.min(obj.x, out);
+            const zoneRight = Math.max(obj.x + sweeperWidth, out);
+            const inZone = catX < zoneRight && catX + 35 > zoneLeft &&
+                catY < obj.y + sweeperHeight + sweeperDetectVPad &&
+                catY + 45 > obj.y - sweeperDetectVPad;
+            if (inZone) {
+                obj.state = 'telegraph';
+                obj.timer = sweeperTelegraphFrames;
+                obj.dom.classList.add('active');
+                playAudioTone(240, 'triangle', 0.12); // A window creaking open
+            }
+            return;
+        }
+
+        obj.timer -= dt;
+        if (obj.timer > 0) return;
+
+        if (obj.state === 'telegraph') {
+            obj.state = 'swing';
+            obj.timer = sweeperSwingFrames;
+            obj.dom.classList.add('swinging');
+            playAudioTone(180, 'sawtooth', 0.15); // The broom whipping through the air
+        } else if (obj.state === 'swing') {
+            obj.state = 'cooldown';
+            obj.timer = sweeperCooldownFrames;
+            obj.dom.classList.remove('active', 'swinging');
+        } else if (obj.state === 'cooldown') {
+            obj.state = 'idle';
+        }
+    });
+}
+
 function handleOverlapSystems() {
     const catWidth = 35;
     const catHeight = 45;
@@ -876,6 +982,10 @@ function handleOverlapSystems() {
             respawnX = spot.x;
             respawnY = spot.y;
             respawnArrival = 'emerge'; // A checkpoint is a thing he squeezes out of, in any level
+            // Face back into the gap, whichever wall the window is in. Horizontal levels have no
+            // `side` on their portal at all, so this falls back to -1 — level 1's one wall to
+            // arrive facing away from is always the direction he runs, never the other way.
+            respawnFace = (isVertical && obj.side === 'right') ? 1 : -1;
 
             meowBubble.innerText = "Checkpoint!";
             meowBubble.style.display = 'block';
@@ -886,6 +996,28 @@ function handleOverlapSystems() {
 
             playAudioTone(660, 'sine', 0.1);
             setTimeout(() => playAudioTone(990, 'sine', 0.15), 110);
+        }
+
+        // Only lethal mid-swing — the window and the telegraph lean are both look-don't-touch.
+        // Reach extends out from her own wall into the gap, opting into tier 1 catnip exactly like
+        // a spike so she doesn't silently become an unblockable hazard once the stash is found.
+        if (obj.type === 'sweeper' && obj.state === 'swing') {
+            const out = obj.side === 'left' ? obj.x + sweeperReach : obj.x - sweeperReach;
+            const reachLeft = Math.min(obj.x, out);
+            const reachRight = Math.max(obj.x + sweeperWidth, out);
+            if (catX < reachRight && catX + catWidth > reachLeft &&
+                catY < obj.y + sweeperHeight && catY + catHeight > obj.y) {
+                if (smashesHazards) {
+                    // A flinch, not a kill: shattering her like a pillar would read as destroying
+                    // a person rather than dodging one. She just loses her nerve and retreats.
+                    obj.state = 'cooldown';
+                    obj.timer = sweeperCooldownFrames;
+                    obj.dom.classList.remove('active', 'swinging');
+                    playAudioTone(320, 'triangle', 0.1);
+                } else {
+                    triggerHurtReset();
+                }
+            }
         }
     });
 }
@@ -1030,7 +1162,7 @@ function triggerHurtReset(cause) {
         isGrounded = true;
         groundedOn = null;
         wasInAirBefore = false;
-        catContainer.style.setProperty('--face', -1); // Out of the pipe facing the way he runs
+        catContainer.style.setProperty('--face', respawnFace); // Facing back into the gap, not the wall
         // Draw the new position by hand before the emerge starts: the loop is still stopped, and
         // without this he would play one frame of climbing out of a pipe wherever he died.
         catContainer.style.left = catX + 'px';
@@ -1259,6 +1391,7 @@ function stepPhysics(dt) {
     // 3. Update the birds — the crows working the air and the pigeons strutting the deck
     BirdEntities.forEach(pig => {
         if (!pig.active) return;
+        if (pig.perched) return; // stands its ground; the idle head-turn is pure CSS
         const travel = pig.speed * pig.dir * dt;
 
         if (pig.axis === 'y') {
@@ -1282,6 +1415,9 @@ function stepPhysics(dt) {
             }
         }
     });
+
+    // 4. Update the sweepers — old women who lean out of a window and swat once Bumbot is close
+    updateSweepers(dt);
 
     handleOverlapSystems();
 }
@@ -1399,6 +1535,7 @@ function loadLevel(index) {
     // A fresh run starts without the checkpoint
     respawnX = level.spawnX;
     respawnY = spawnY;
+    respawnFace = -1;
     respawnArrival = level.arrival || 'emerge';
     introHold = false; // Any arrival still in flight from the last level is abandoned
     snacks = 1; // Restores the one snack Bumbot always starts a run with

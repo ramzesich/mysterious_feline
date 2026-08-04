@@ -90,6 +90,31 @@ body {
     border-top: 1px solid rgba(255, 159, 28, 0.5);
     box-sizing: border-box;
 }
+/* A second, lower roofline (buildWalls(), `w.roofEdge`) for a wall whose own parapet sits above the
+   frame and is never seen. Level 2 uses it so the taller right building still shows a roof edge
+   level with the left one, at the height Bumbot actually starts from.
+   Deliberately the SAME gravel/felt recipe as .ledge-roof, not the thin amber-lined parapet cap
+   above (.facade-wall::before) — the first cut borrowed that one, and a thin lip with a danger
+   line reads as a wall's cap, not as a rooftop. This has to look like the deck Bumbot is
+   standing on across the gap, even though — unlike .ledge-roof — it is purely decorative and
+   carries no collision of its own. */
+.facade-roof-edge {
+    position: absolute;
+    height: 15px;
+    z-index: 1; /* Level with the wall's own coping, still behind the ledges */
+    pointer-events: none;
+    box-sizing: border-box;
+    background:
+        radial-gradient(circle 1.5px at 18px 5px, rgba(255, 255, 255, 0.14), transparent),
+        radial-gradient(circle 1.3px at 51px 8px, rgba(0, 0, 0, 0.32), transparent),
+        radial-gradient(circle 1.6px at 88px 4px, rgba(255, 255, 255, 0.10), transparent),
+        repeating-linear-gradient(90deg, rgba(0, 0, 0, 0.24) 0 2px, transparent 2px 96px),
+        linear-gradient(#4a4741 0 5px, #2f2d29 5px 9px, #1b1a18 9px 100%);
+    background-size: 160px 100%, 160px 100%, 160px 100%, 96px 100%, 100% 100%;
+    background-repeat: repeat-x;
+    border: 1px solid #26221d;
+    border-top: 3px solid #5b574f;
+}
 #ui {
     position: absolute;
     top: 15px;
@@ -223,13 +248,20 @@ body {
 .cat-land { animation: catLand 0.18s ease-out; }
 
 /* Climbing out of a vent pipe: he starts tucked inside the bore and small, then steps out onto
-   the deck. Applied to #catContainer rather than #cat, so it never has to re-state
-   scaleX(var(--face)) — facing lives on the container and is inherited down. transform-origin is
-   already bottom centre, so the growth reads as him standing up out of the pipe. */
+   the deck. Applied to #catContainer, not #cat — but unlike the old comment here used to claim,
+   that does NOT get --face's mirroring for free: --face's scaleX lives on #cat, a *child*, and a
+   child's transform has no effect on how its parent's own transform reads. #catContainer can read
+   the same custom property directly, though (it's set on that element, not just inherited down
+   to it), so the slide distance is written as var(--face) * a fixed offset instead of a bare
+   px value. --face is -1 by default (facing right), which reproduces the original numbers exactly
+   — this only changes anything for level 2's checkpoint, whose window can sit in either wall (see
+   respawnFace in game.js). Without it, emerging from the right-wall window slid him rightward,
+   into the bricks, whichever way he was facing. transform-origin is already bottom centre, so the
+   growth still reads as him standing up out of the opening either way. */
 @keyframes catEmerge {
-    0% { transform: translateX(-17px) scale(0.5); opacity: 0.35; }
-    35% { transform: translateX(-11px) scale(0.72); opacity: 1; }
-    75% { transform: translateX(-2px) scale(1.02); opacity: 1; }
+    0% { transform: translateX(calc(var(--face, -1) * 17px)) scale(0.5); opacity: 0.35; }
+    35% { transform: translateX(calc(var(--face, -1) * 11px)) scale(0.72); opacity: 1; }
+    75% { transform: translateX(calc(var(--face, -1) * 2px)) scale(1.02); opacity: 1; }
     100% { transform: translateX(0) scale(1); opacity: 1; }
 }
 .cat-emerge { animation: catEmerge 0.42s ease-out; }
@@ -1266,6 +1298,14 @@ button.secondary:hover { background: #1b1e2c; color: #aab3c4; }
 .bird.pigeon .pig-neck { animation: pigHeadBob 0.88s ease-in-out infinite; }
 .bird.pigeon .pig-head { animation: pigPeck 4.6s ease-in-out infinite; }
 .bird.pigeon .pig-wing { animation: pigWingShuffle 3.7s ease-in-out infinite; }
+/* A perched pigeon (level 2's ledge-sitters) has nowhere to walk, so the gait itself stops —
+   only the neck/head/tail idle motions keep running, which is what reads as "turning its head"
+   rather than "marching in place." */
+.bird.pigeon.perched .pig-all,
+.bird.pigeon.perched .pig-leg-front,
+.bird.pigeon.perched .pig-leg-back {
+    animation: none;
+}
 .cracked {
     position: absolute;
     width: 100%;
@@ -1600,6 +1640,126 @@ button.secondary:hover { background: #1b1e2c; color: #aab3c4; }
 @keyframes goalWindowGlow {
     0%, 100% { box-shadow: inset 0 0 18px rgba(255, 186, 90, 0.40), 0 0 20px rgba(255, 176, 70, 0.26); }
     50% { box-shadow: inset 0 0 22px rgba(255, 186, 90, 0.55), 0 0 30px rgba(255, 176, 70, 0.40); }
+}
+
+/* --- The broom-sweeper: an old woman who looks like a shuttered window until Bumbot gets close,
+   then leans out and swats him off the wall. Same stone surround as the sash-window checkpoint —
+   she's furniture in the same wall, not a separate thing bolted on — but z-index has to put her
+   IN FRONT of Bumbot rather than behind, because unlike a pipe or a portal she actually reaches
+   for him. State classes (.active, .swinging) are driven by updateSweepers() in game.js. */
+.sweeper {
+    position: absolute;
+    width: 50px;
+    height: 64px;
+    z-index: 12; /* level with the birds — she reaches into his space, they don't stay behind it */
+}
+.sweeper-window {
+    position: absolute;
+    inset: 0;
+    box-sizing: border-box;
+    border: 3px solid #4a4238;
+    background: linear-gradient(#1c1a20 0%, #100e12 100%);
+    box-shadow: inset 0 0 10px rgba(0, 0, 0, 0.8);
+    transition: background 0.3s ease-out;
+}
+/* Clips the figure at the window's own box. Deliberately a sibling of .sweeper-window rather than
+   overflow:hidden on .sweeper itself (or on the window) — either of those would also clip the
+   window's own lintel/sill (::before/::after), which are *meant* to overhang past this box into
+   the wall. Without this, "tucked below the sill" just rendered below the window fully visible —
+   translateY moves an element, it does not hide it, and .sweeper had nothing clipping its box. */
+.sweeper-mask {
+    position: absolute;
+    inset: 0;
+    overflow: hidden;
+    pointer-events: none;
+}
+/* Stone surround, same lintel-and-sill language as .sash-window */
+.sweeper-window::before {
+    content: '';
+    position: absolute;
+    left: -5px; right: -5px; top: -7px; height: 7px;
+    background: linear-gradient(#6f6657 0 3px, #4d453b 3px 100%);
+    box-shadow: 0 2px 3px rgba(0, 0, 0, 0.55);
+}
+.sweeper-window::after {
+    content: '';
+    position: absolute;
+    left: -6px; right: -6px; bottom: -6px; height: 6px;
+    background: linear-gradient(#776d5d 0 2px, #514840 2px 100%);
+}
+.sweeper.active .sweeper-window {
+    background: linear-gradient(#2a2620 0%, #1a1712 100%); /* a little warmer once she's stirring */
+}
+
+/* The figure. Two stacked blobs read as a bent back and a headscarf without needing real anatomy —
+   legible the same way a pigeon reads through silhouette plus motion rather than detail. Tucked
+   below the sill until triggered, then rises into the opening. */
+.sweeper-rig {
+    position: absolute;
+    left: 50%;
+    bottom: 2px;
+    width: 34px;
+    height: 52px;
+    margin-left: -17px;
+    transform-origin: 50% 100%;
+    /* 75px, not the rig's own 52px height — the raised arm's rotated bounding box reaches further
+       than the unrotated rig, and .sweeper-mask clips at 0, so anything less left it poking out
+       above the window even while "tucked away". */
+    transform: translateY(75px); /* out of sight below the sill */
+    transition: transform 0.32s cubic-bezier(0.34, 1.3, 0.64, 1);
+}
+/* Authored for a left-wall sweeper (swings rightward, into the gap); a right-wall one is the same
+   rig mirrored, exactly like a pigeon's facing — one drawing, not two. */
+.sweeper-right .sweeper-rig { transform: translateY(75px) scaleX(-1); }
+.sweeper.active .sweeper-rig { transform: translateY(4px); }
+.sweeper.active.sweeper-right .sweeper-rig { transform: translateY(4px) scaleX(-1); }
+
+.sweeper-body {
+    position: absolute;
+    left: 2px; right: 2px; bottom: 0;
+    height: 34px;
+    background: linear-gradient(#3a3430 0%, #221f1c 100%);
+    border-radius: 45% 45% 15% 15%;
+}
+.sweeper-body::after { /* the headscarf */
+    content: '';
+    position: absolute;
+    left: 6px; right: 6px; top: -14px; height: 18px;
+    background: linear-gradient(#544838 0%, #322a20 100%);
+    border-radius: 50% 50% 40% 40%;
+}
+.sweeper-arm {
+    position: absolute;
+    left: 26px; top: 6px;
+    width: 5px; height: 24px;
+    background: #241f1c;
+    border-radius: 2px;
+    transform-origin: 50% 8%; /* the shoulder */
+    transform: rotate(95deg); /* held in close, out of the way, while she's still just leaning out */
+    transition: transform 0.2s ease-in;
+}
+/* The swing itself: fast out, matching sweeperSwingFrames in game.js so the lethal window and the
+   animation agree on when the broom is actually extended. */
+.sweeper.swinging .sweeper-arm {
+    transform: rotate(-40deg);
+    transition: transform 0.16s cubic-bezier(0.2, 0.9, 0.3, 1.3);
+}
+.sweeper-broom {
+    position: absolute;
+    left: 50%;
+    bottom: -3px;
+    width: 3px;
+    height: 22px;
+    margin-left: -1.5px;
+    background: #5c4a30;
+}
+.sweeper-broom::after { /* the bristles */
+    content: '';
+    position: absolute;
+    left: -6px; bottom: -10px;
+    width: 15px; height: 12px;
+    background: linear-gradient(#a8925c 0%, #7c6840 100%);
+    clip-path: polygon(20% 0, 80% 0, 100% 100%, 0 100%);
 }
 
 /* Getting in: the exact reverse of catEmerge, because every entrance and exit in this game is
