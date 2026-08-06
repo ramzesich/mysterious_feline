@@ -16,6 +16,7 @@ const nearBuildings = document.getElementById('nearBuildings');
 const devPanel = document.getElementById('devPanel');
 const pigeonSprite = document.getElementById('pigeonSprite'); // <template>, cloned per walking bird
 const crowSprite = document.getElementById('crowSprite');     // <template>, cloned per flying bird
+const gargoyleSprite = document.getElementById('gargoyleSprite'); // <template>, cloned per gargoyle ledge
 
 // The frame is per-level now: level 1 is a 700x350 letterbox you run across, level 2 a 400x620
 // portrait you fall down. These follow the loaded level via applyLevelGeometry(), so anything
@@ -65,6 +66,30 @@ let faceDirection = 1;
 const moveSpeed = 7;
 const gravity = 0.8;
 const jumpForce = 15;
+// Releasing jump clips the rest of the climb, so a tap is a hop and a hold is the full arc. Apex from
+// a given speed is v^2/(2*gravity), so 7.5 gives ~35px against the full 141px.
+//
+// This exists because of level 2's balcony railings. Their outer end is solid (see the `rail` entity
+// in generateLevel), so leaving a balcony *requires* a jump — and with a single fixed impulse that
+// meant every one of those exits launched him 141px up and roughly doubled his airtime, turning a
+// ~158px step-off into a ~337px arc across gaps only 55-145px wide. The level's whole reach budget is
+// written around walking off a lip. A tap now clears the 26px rail with ~9px to spare and keeps the
+// arc close to the walk-off it replaced.
+//
+// It is deliberately a CEILING rather than a multiplier: clipping to a fixed speed makes the shortest
+// possible hop the same height however early the key comes up, so the minimum clearance over a railing
+// can be reasoned about. A multiplier would make it depend on reaction time.
+// Level 1 is unaffected as long as the key is held — its 135px platforms still need the full jump.
+const jumpCutSpeed = 7.5;
+
+// The balcony railing, as physics rather than as paint. `railHeight` MUST match
+// `.ledge-balcony::before`'s height in style.css — the collider is invisible, so if the two drift the
+// level gets a barrier that is taller or shorter than the iron the player can see, which is the least
+// fair kind of obstacle there is. `railBlockWidth` is only the solid outer END, not the whole run: the
+// rest of a railing is decoration he stands behind, and making all of it solid would fence him onto
+// the slab with no way off at all.
+const railHeight = 26;
+const railBlockWidth = 6;
 
 // Jump apex is jumpForce^2 / (2 * gravity) ~= 141px. The tallest platform sits at
 // 120 + 15 for the slab = 135px, so there is only ~6px of headroom: raising gravity
@@ -82,11 +107,13 @@ const maxSliceTravel = 10;
 // Timers are in 60fps frames like everything else, so they scale with dt the same way.
 const sweeperWidth = 50;
 const sweeperHeight = 64;
-// How far the broom's lethal hitbox extends out from her own x. This has to cover the LEDGE she
-// overlooks, edge to edge — she is sweeping him off it, and a reach that stops short just leaves a
-// safe pocket at the outer lip, which is exactly where he stands to drop anyway. 75 covers level 2's
-// 130px gargoyle ledge from a window mounted flush with the wall's inner face, and matches where the
-// drawn bristles actually land at full swing (see .sweeper-arm in style.css).
+// How far the broom's lethal hitbox extends out from her own x. This is a property of the BROOM, not of
+// the ledge: 75 is roughly where the drawn bristles land at full swing (see .sweeper-arm), and
+// .sweeper-mask reaches 80px out so that stroke is visible rather than clipped at the wall. Keep the
+// three in step — a reach past the mask kills with the end of an invisible broom.
+// How much of a ledge is threatened is decided by where she is MOUNTED, not by this number. Level 2
+// mounts her back from the wall's inner face deliberately, so her stroke dies short of the ledge's
+// outer lip and leaves a pocket to land in.
 const sweeperReach = 75;
 const sweeperDetectOut = 140; // How far into the gap the "notice him" zone reaches
 // Vertical padding above and below her window for detection, and deliberately SMALL. A generous pad
@@ -273,6 +300,13 @@ window.addEventListener('keyup', (e) => {
     if (e.key === 'ArrowLeft' || e.key === 'ArrowRight' || e.key === 'ArrowUp' || e.code === 'Space') {
         const keyName = e.code === 'Space' ? 'Space' : e.key;
         keys[keyName] = false;
+        // Let go on the way up and the climb is cut short — see jumpCutSpeed. Only while still
+        // RISING: applied on the way down it would brake his fall, and applied while grounded it
+        // would fight the launch impulse on the very frame he takes off.
+        // Not dt-scaled, because it is a clamp on velocity rather than an acceleration.
+        if ((keyName === 'ArrowUp' || keyName === 'Space') && !isGrounded && velocityY > jumpCutSpeed) {
+            velocityY = jumpCutSpeed;
+        }
     }
 });
 
@@ -281,8 +315,10 @@ let BirdEntities = [];
 
 // Only these types take part in solid collision. Spikes, snacks and the checkpoint portal
 // are overlap-only, so they are handled in handleOverlapSystems instead.
+// `rail` is the solid outer end of a balcony railing — generated by generateLevel rather than placed
+// in level data, because it belongs to the railing rather than being a thing a level author positions.
 function isSolidType(type) {
-    return type === 'pillar' || type === 'platform' || type === 'mover';
+    return type === 'pillar' || type === 'platform' || type === 'mover' || type === 'rail';
 }
 
 // Platforms and movers are thin slabs you land on top of; pillars are full-height blocks.
@@ -522,6 +558,15 @@ function generateLevel() {
             // wall and which kind. Cosmetic only — collision is the same 15px slab either way.
             if (obj.side) element.classList.add('ledge', 'ledge-' + obj.side);
             if (obj.variant) element.classList.add('ledge-' + obj.variant);
+            // The gargoyle is the one variant whose art is a cloned sprite rather than a pseudo-element:
+            // a face needs real geometry. It hangs below the slab where .ledge::after's corbel would
+            // otherwise be, which .ledge-gargoyle::after suppresses.
+            if (obj.variant === 'gargoyle') {
+                const head = document.createElement('div');
+                head.classList.add('gargoyle-sprite');
+                head.appendChild(gargoyleSprite.content.cloneNode(true));
+                element.appendChild(head);
+            }
             element.style.left = obj.x + 'px';
             element.style.width = obj.width + 'px';
             element.style.bottom = (40 + obj.height) + 'px';
@@ -546,6 +591,15 @@ function generateLevel() {
             // A vertical level's checkpoint is partway down a wall, so it needs a height. Level 1's
             // sit on the deck and omit y, which is why this falls back to 0.
             element.style.bottom = (40 + (obj.y || 0)) + 'px';
+        } else if (obj.type === 'window') {
+            // Pure scenery: a window in the masonry, absent from isSolidType()/isSlabType(), from the
+            // meow sweep and from handleOverlapSystems() — the same "decorative twin of a real thing"
+            // arrangement as `pipe` is to `portal`. Its size is fixed in CSS rather than taken from the
+            // data, because every window in the facade has to be the same one for the sweeper to hide
+            // among them.
+            element.classList.add('wall-window');
+            element.style.left = obj.x + 'px';
+            element.style.bottom = (40 + obj.y) + 'px';
         } else if (obj.type === 'sweeper') {
             // A window that looks shuttered until Bumbot gets close, then leans an old woman and
             // her broom out of it. `side` says which wall — and which way the broom swings, into
@@ -555,8 +609,13 @@ function generateLevel() {
             element.style.bottom = (40 + obj.y) + 'px';
             // .sweeper-mask is a sibling of the window, not a wrapper around it, so it can clip
             // the figure without also clipping the window's own overhanging lintel/sill.
+            // The window is a plain `.wall-window`, identical to the decorative ones down the facade —
+            // that shared drawing is the camouflage the whole ambush rests on — and the glass sits on a
+            // `.sweeper-sash` child that swings open when she leans through it.
             element.innerHTML =
-                '<div class="sweeper-window"></div>' +
+                '<div class="wall-window sweeper-window">' +
+                    '<div class="sweeper-sash"></div>' +
+                '</div>' +
                 '<div class="sweeper-mask">' +
                     '<div class="sweeper-rig">' +
                         '<div class="sweeper-body"></div>' +
@@ -581,6 +640,34 @@ function generateLevel() {
             entity.timer = 0;
         }
         RuntimeEntities.push(entity);
+
+        // A balcony's railing is solid at its GAP-FACING end, so he cannot simply stroll off the lip —
+        // he has to get over the iron first. That end is the right-hand one on a left-hand wall and the
+        // left-hand one on a right-hand wall: always the end pointing into the gap, never the one
+        // buried in masonry.
+        //
+        // Generated here rather than placed in level data because it is part of the railing: a level
+        // author choosing `variant: 'balcony'` should not also have to remember to bolt a collider onto
+        // one specific end of it, and the two could then disagree.
+        //
+        // It carries no DOM of its own. `.ledge-balcony::before` already draws the whole railing
+        // including this end, so a second element would just paint over it — this is collision only,
+        // which is why nothing here adds `.level-entity` (there is no node to clear).
+        if (obj.type === 'platform' && obj.variant === 'balcony') {
+            const slabTop = obj.height + 15;
+            // 2px in from each end, matching the railing drawing's own inset, so the collider sits
+            // under iron that is actually painted rather than sticking out past it.
+            const outerEnd = obj.side === 'right' ? obj.x + 2 : obj.x + obj.width - 2 - railBlockWidth;
+            RuntimeEntities.push({
+                type: 'rail',
+                x: outerEnd,
+                width: railBlockWidth,
+                height: slabTop + railHeight, // top surface, so the landing branch stands him on it
+                solidMinY: slabTop,           // ...and this keeps it from being a column to the street
+                dom: null,
+                active: true
+            });
+        }
     });
 
     level.birds.forEach((pig) => {
@@ -834,6 +921,11 @@ function checkSolidCollision(targetX, targetY) {
             objMinY = obj.height;
             objMaxY = obj.height + 15;
         }
+        // A box that does not start at the ground. Only a `rail` uses this so far: it is 26px of iron
+        // standing on top of a slab, not a column rising out of the street. Its `height` still means
+        // "top surface", exactly as a pillar's does, which is what lets the landing branch below put
+        // him on top of it without a special case.
+        if (obj.solidMinY !== undefined) objMinY = obj.solidMinY;
         if (targetX < objMaxX && targetX + catWidth > objMinX && targetY < objMaxY && targetY + catHeight > objMinY) {
             return obj;
         }

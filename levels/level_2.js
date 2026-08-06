@@ -32,9 +32,45 @@
 //   * Fast falls are why stepPhysics slices by distance: terminal speed down a 620px screen is
 //     ~31px/frame against 15px slabs, which would tunnel clean through a balcony.
 //
-// Ledge variants (`variant`): balcony, gargoyle, sill, awning. Cosmetic only — collision is the
+// Ledge variants (`variant`): balcony, gargoyle, awning — or none at all, which is a plain stone
+// ledge with just its corbel. Cosmetic only — collision is the
 // same 15px slab as level 1's catwalks. `side` is which wall the ledge grows out from, and a right
 // ledge's `x` is always 400 - width, because it is bolted to the right-hand building.
+// There was a fourth variant, `sill`, which drew a window above the slab. It is gone: a window
+// belongs to the WALL, where the `window` entity already draws it and knows where in the masonry it
+// actually sits. Four ledges (3740, 2265, 1770, 780) are the bare ones left behind.
+//
+// SCENERY DISTRIBUTION is a separate concern from the drop rhythm above, and it wants the opposite
+// thing. Drops are deliberately uneven; the variants should be *even*, because a variant is a piece
+// of set dressing rather than a beat of gameplay. The gargoyles in particular were all bunched — five
+// of six on the left wall, three of them inside one 530px stretch and then a 1310px stretch with
+// none — which read as "the artist got bored here" instead of as a facade. They now alternate walls
+// strictly, right/left all the way down, 515-650px apart.
+// The check that matters when moving one: does any pair on the SAME wall fall within one frame
+// height (620px) of each other? That is what reads as a cluster; the raw spacing barely matters.
+//
+// The one deliberate exception is the 975px stretch between 2500 and 1525, which carries no gargoyle
+// at all. That is the CHECKPOINT's stretch — it already holds two plain ledges and the respawn
+// balcony, and
+// the one landmark in the level should own the part of the wall it sits on.
+//
+// Two ledges are pinned and neither is about spacing:
+//   * 2100 carries NO railing — it is bare stone. It is the checkpoint ledge, and the sash window sits
+//     in the wall directly above its slab: the window's lower third is an open gap he squeezes out of,
+//     and a railing stood right in it. Worse, the lit state of that window is translucent there, so the
+//     balusters showed *through* the glow. A railing is also the last thing wanted at the one merciful
+//     moment in the level now that a railing is something to climb.
+//   * 1525 stays a gargoyle, because a gargoyle is the only variant that draws NOTHING above the
+//     slab. The sweeper leans out at 1550, and a railing there would reach into her stonework — and
+//     since she is z-index 5 against a ledge's 2, *her* sill would paint over it, the reverse of how
+//     the decorative windows sit behind one. That inconsistency is precisely what would make her
+//     identifiable before she moves.
+//
+// Where a gargoyle can go is constrained too, and both constraints are about the head hanging BELOW
+// the slab. It must sit entirely over its own wall and entirely under its own slab, or the spout
+// projects into open air and reads as footing — which on a left ledge means anywhere (the sprite is
+// 66px and the wall 110), but on a right ledge means the ledge's right edge is at 400 and the head
+// occupies 334-400, so the wall must reach that far.
 
 const LEVEL_2 = {
     id: 'the-long-way-down',
@@ -115,57 +151,52 @@ const LEVEL_2 = {
         // === Upper storeys: gentle, to teach that walking off the lip is the whole verb. Drops
         // 150 / 205 / 135.
         { type: 'platform', x: 250, width: 150, height: 3945, side: 'right', variant: 'balcony' },
-        { type: 'platform', x: 0, width: 140, height: 3740, side: 'left', variant: 'sill' },
-        { type: 'platform', x: 230, width: 170, height: 3605, side: 'right', variant: 'balcony' },
+        { type: 'platform', x: 0, width: 140, height: 3740, side: 'left' },
+        { type: 'platform', x: 230, width: 170, height: 3605, side: 'right', variant: 'gargoyle' },
 
         // === The first long one, onto a narrow sill. Drops 240 / 175 / 130.
-        { type: 'platform', x: 0, width: 130, height: 3365, side: 'left', variant: 'gargoyle' },
-        // The disguised ledge: no `side`, so it renders as a bare catwalk slab rather than
-        // wall-grown stonework — reads as an old fire-escape landing strung between the two
-        // buildings, which is exactly period-correct for this alley. Holding right the whole way
-        // off the gargoyle (the fast, obvious line) never dips this low before x has already
-        // carried past it, so default play never touches it; only easing off right — or letting go
-        // to fall straighter — lands here. From it, awning is a trivial 10px reach with 55px of
-        // drop to spend, so there is no way to strand on it.
-        { type: 'platform', x: 170, width: 60, height: 3245, hidden: true },
+        { type: 'platform', x: 0, width: 130, height: 3365, side: 'left', variant: 'balcony' },
         { type: 'platform', x: 240, width: 160, height: 3190, side: 'right', variant: 'awning' },
         { type: 'platform', x: 0, width: 120, height: 3060, side: 'left', variant: 'gargoyle' },
 
         // === Tightest reach in the level: two narrow ledges, 110 and 120, needing 135px of travel
         // against 166px available. Drops 225 / 190 / 145.
-        { type: 'platform', x: 290, width: 110, height: 2835, side: 'right', variant: 'gargoyle' },
+        { type: 'platform', x: 290, width: 110, height: 2835, side: 'right', variant: 'balcony' },
         { type: 'platform', x: 0, width: 150, height: 2645, side: 'left', variant: 'balcony' },
-        { type: 'platform', x: 210, width: 190, height: 2500, side: 'right', variant: 'balcony' },
+        { type: 'platform', x: 210, width: 190, height: 2500, side: 'right', variant: 'gargoyle' },
 
         // === Halfway. A long drop onto the balcony with the window he squeezes out of on every
         // respawn from here on. Drops 235 / 165.
-        { type: 'platform', x: 0, width: 120, height: 2265, side: 'left', variant: 'sill' },
-        { type: 'platform', x: 230, width: 170, height: 2100, side: 'right', variant: 'balcony' },
+        { type: 'platform', x: 0, width: 120, height: 2265, side: 'left' },
+        { type: 'platform', x: 230, width: 170, height: 2100, side: 'right' },
         // `side` here isn't cosmetic like a ledge's — it's what tells the respawn which way is
         // "back into the gap" so he doesn't climb out facing the bricks (see respawnFace in game.js).
         { type: 'portal', x: 330, y: 2115, side: 'right' },
 
         // === Lower storeys, mixed rhythm. Drops 200 / 130 / 245 / 160 / 215 / 140.
         { type: 'platform', x: 0, width: 160, height: 1900, side: 'left', variant: 'balcony' },
-        { type: 'platform', x: 250, width: 150, height: 1770, side: 'right', variant: 'sill' },
+        { type: 'platform', x: 250, width: 150, height: 1770, side: 'right' },
         // The sweeper, mounted on the left wall he's already committed to by the time he's this
         // close (the 245px drop off the sill is the longest horizontal traverse in the level).
         // TWO placement rules, and she is inert if either is broken — she was, both ways, at first:
-        //   * x is the wall's INNER face (wall width 110 - her own 50), not 0. At 0 she sits at the
-        //     outer edge of her own building with 60px of masonry between her and the gap, and the
-        //     broom sweeps nothing but brick.
+        //   * x decides how much of the ledge she threatens, since her reach is measured from it.
+        //     At 0 she sits at the outer edge of her own building with 60px of masonry between her
+        //     and the gap, and the broom sweeps nothing but brick. At 20 her stroke dies at ~95,
+        //     which leaves the ledge's last ~35px — its overhang past the wall — as a pocket he can
+        //     land in and watch her swipe short. Holding left the whole way down off the sill lands
+        //     him at ~77, inside her reach; easing off the key drops him straighter, into the pocket.
         //   * y sits just above the ledge below (slab tops out at 1540), because the lethal band is
         //     her window's own span. Mounted 75px up "so the telegraph has room to play out in the
         //     air", her band started 15px above his ears — she could not have hit him at any x, on
         //     any frame. The telegraph gets its air time from the detect zone instead.
-        { type: 'sweeper', x: 60, y: 1550, side: 'left' },
+        { type: 'sweeper', x: 20, y: 1550, side: 'left' },
         { type: 'platform', x: 0, width: 130, height: 1525, side: 'left', variant: 'gargoyle' },
         { type: 'platform', x: 220, width: 180, height: 1365, side: 'right', variant: 'awning' },
-        { type: 'platform', x: 0, width: 110, height: 1150, side: 'left', variant: 'gargoyle' },
-        { type: 'platform', x: 240, width: 160, height: 1010, side: 'right', variant: 'balcony' },
+        { type: 'platform', x: 0, width: 110, height: 1150, side: 'left', variant: 'balcony' },
+        { type: 'platform', x: 240, width: 160, height: 1010, side: 'right', variant: 'gargoyle' },
 
         // === The last three, and the longest drop in the level at 250. Drops 230 / 170 / 250.
-        { type: 'platform', x: 0, width: 140, height: 780, side: 'left', variant: 'sill' },
+        { type: 'platform', x: 0, width: 140, height: 780, side: 'left' },
         { type: 'platform', x: 210, width: 190, height: 610, side: 'right', variant: 'balcony' },
         { type: 'platform', x: 0, width: 150, height: 360, side: 'left', variant: 'gargoyle' },
 
@@ -173,13 +204,42 @@ const LEVEL_2 = {
         // and the street are both in shot — and the drop off this ledge goes through the window.
         { type: 'platform', x: 250, width: 150, height: 225, side: 'right', variant: 'balcony' },
 
-        // The first snack now sits over the disguised ledge above (3245-3260 slab), just above
-        // standing-reach height rather than on the default fall line, so grabbing it means finding
-        // the ledge rather than flying through it. The second is left on its fall line — one of the
-        // two stays "collected in passing" on purpose, so the level teaches the easy read before
-        // asking for the careful one.
-        { type: 'snack', x: 195, height: 3270 },
-        { type: 'snack', x: 205, height: 1460 }
+        // The first snack sits on the awning (slab tops out at 3205), at its WALL end — so reaching it
+        // means walking back along the canvas, away from the onward route, which is down and to the
+        // left. The second is left on its fall line — one of the two stays "collected in passing" on
+        // purpose, so the level teaches the easy read before asking for the careful one.
+        // It used to sit at x:195 over a hidden ledge at 3245, which is gone; left there it would have
+        // floated in the middle of the open slot, reachable only by falling down the one channel that
+        // kills you.
+        { type: 'snack', x: 360, height: 3215 },
+        { type: 'snack', x: 205, height: 1460 },
+
+        // === Windows. Pure scenery — no collision, nothing to collect — and they do two jobs. They
+        // give the masonry somewhere for people to live, and they are the sweeper's camouflage: she is
+        // the same 50x64 `.wall-window` drawing, so with only her own window in the level she was the
+        // one thing on the facade worth looking at.
+        //
+        // Coverage: these 8, plus the checkpoint's sash window and the sweeper = 10 of the 21 wall
+        // ledges. It used to be 14, because the four `sill` ledges drew a window of their own; that
+        // variant is gone, so these are now the only ordinary windows in the level and they carry the
+        // sweeper's camouflage on their own. If this list ever shrinks, check her first — she is only
+        // hidden for as long as an unremarkable window is a common sight on this facade.
+        // `y` is the ledge's slab top + 10 throughout, matching hers, which puts the window's stone
+        // sill just clear of the slab. On a balcony the 18px railing then crosses the bottom of the
+        // glass, which is what a balcony looks like — z-index 1 keeps the glass behind it.
+        // `x` stays inside the wall's own footprint: 0..60 on the left, 270..350 on the right.
+        //
+        // The un-windowed third is chosen, not left over: both awnings (canvas belongs over a shop
+        // front, not under a bedroom) and the whole bottom of the shaft — below 780 there is nothing
+        // but the goal window, so it stays the only lit thing down there.
+        { type: 'window', x: 300, y: 3970 },  // over the first balcony
+        { type: 'window', x: 318, y: 3630 },
+        { type: 'window', x: 22,  y: 3390 },
+        { type: 'window', x: 38,  y: 3085 },
+        { type: 'window', x: 18,  y: 2670 },
+        { type: 'window', x: 312, y: 2525 },
+        { type: 'window', x: 14,  y: 1175 },
+        { type: 'window', x: 306, y: 1035 }
     ],
 
     // The wildlife arrives with the hazard pass: a pigeon perched on a ledge turning its head

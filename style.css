@@ -1394,78 +1394,90 @@ button.secondary:hover { background: #1b1e2c; color: #aab3c4; }
     box-sizing: border-box;
     clip-path: polygon(0% 0%, 100% 0%, 58% 100%, 0% 100%);
 }
-.ledge::before { content: none; } /* Variants opt in to a topside; a bare ledge has none */
+/* Variants opt in to a topside; a bare ledge has none.
+   `top: auto` is load-bearing and belongs HERE rather than on each variant. .platform::before sets
+   `top: 100%` for level 1's support legs, which hang below the slab. A variant that then asks for
+   `bottom: 100%` plus a `height` — as the balcony railing does — leaves top, height AND bottom all
+   specified, and CSS resolves that over-constrained case by throwing `bottom` away. Every railing in
+   the level was therefore drawn UNDER its own slab, a row of balusters hanging beneath the stone like
+   teeth, and the "::before is everything above the slab" rule the variants are written to was quietly
+   false. Resetting it once here fixes every variant at once, and works because this rule comes after
+   .platform::before in source order. The awning is unaffected: its valance genuinely hangs below the
+   front edge, so it declares its own `top` and overrides this. */
+.ledge::before { content: none; top: auto; }
 .ledge-left::after { left: 0; right: auto; }
 .ledge-right::after { left: auto; right: 0; transform: scaleX(-1); }
 
 /* --- Balcony: wrought-iron railing over the stone. The railing is the strongest "this is a
-   building someone lives in" cue in the level, and it is drawn above the slab so it can never be
-   mistaken for something to stand on.
+   building someone lives in" cue in the level.
    Iron is LIGHTER than the wall behind it, not darker. The first cut used near-black on near-black
    and simply did not exist on screen; a railing at night reads by the light along its top rail, the
-   same way Bumbot and the birds read by their rim light. */
+   same way Bumbot and the birds read by their rim light.
+   26px tall. The height is no longer only a drawing decision — the outer end of the railing is solid,
+   so this figure is also how far Bumbot has to get off the slab to leave a balcony. Change it and the
+   rail block in game.js has to move with it; `railHeight` there reads this number. */
+/* A balcony is the ONE ledge that sits in front of Bumbot (10) rather than behind him at .ledge's 2.
+   He stands on the floor of it with the railing between him and the street, so the iron has to cross
+   his legs — drawn behind him he reads as standing on the handrail, and the jump the solid outer end
+   demands stops making sense, because you cannot climb over something that is behind you.
+   11 specifically: above him, still below the birds (12) so a crow crosses in front of the railing as
+   it should, and below the meow ripple (15) and rubble (25).
+   Raising the whole ledge is safe rather than lazy. The slab is drawn from the ledge's own bottom up to
+   exactly where his feet are, so it never overlaps his sprite, and the corbel below it would only reach
+   him if he stood within ~58px *beneath* a balcony, which no drop in the level allows. */
+.ledge-balcony { z-index: 11; }
 .ledge-balcony::before {
     content: '';
     position: absolute;
     bottom: 100%;
     left: 2px;
     right: 2px;
-    height: 18px;
+    height: 26px;
     background:
         /* Top rail: a bright edge over a solid bar. This is the line that carries the whole shape */
         linear-gradient(rgba(255, 210, 160, 0.55) 0 1px, #6c6660 1px 3.5px, transparent 3.5px),
-        /* Mid rail, dimmer */
-        linear-gradient(transparent 0 10px, rgba(122, 116, 108, 0.85) 10px 11.5px, transparent 11.5px),
+        /* Mid rail, dimmer. Sits a little below centre — level with the top it crowds the bright edge,
+           and centred exactly it splits the balusters into two equal halves and reads as a ladder. */
+        linear-gradient(transparent 0 15px, rgba(122, 116, 108, 0.85) 15px 16.5px, transparent 16.5px),
         /* Balusters. Periodic is right here — real railings are evenly spaced */
         repeating-linear-gradient(90deg, #55504b 0 2px, transparent 2px 11px);
     filter: drop-shadow(0 1px 1px rgba(0, 0, 0, 0.8));
 }
 
 /* --- Gargoyle: a carved head on a short bracket, jutting out under the ledge. Replaces the plain
-   corbel entirely — this IS the support, and it is the one piece of the facade with a face. */
-.ledge-gargoyle::after {
-    content: '';
-    position: absolute;
-    top: 100%;
-    width: 46px;
-    height: 26px;
-    background:
-        /* Two sunken eyes and the dark of an open mouth, placed rather than patterned */
-        radial-gradient(circle 2.2px at 13px 8px, #0a090c 0 100%, transparent 100%),
-        radial-gradient(circle 2.2px at 24px 9px, #0a090c 0 100%, transparent 100%),
-        radial-gradient(ellipse 7px 3px at 12px 19px, #0d0c10 0 100%, transparent 100%),
-        /* Brow ridge catching the light, then the muzzle falling into shadow */
-        linear-gradient(#6b6355 0 4px, #574f44 4px 13px, #3a352d 13px 100%);
-    /* A blunt snout tapering down and away from the wall */
-    clip-path: polygon(0% 0%, 100% 0%, 88% 46%, 58% 100%, 8% 92%, 0% 55%);
-    filter: drop-shadow(0 2px 3px rgba(0, 0, 0, 0.6));
-}
-.ledge-gargoyle.ledge-left::after { left: 0; }
-.ledge-gargoyle.ledge-right::after { right: 0; transform: scaleX(-1); }
+   corbel entirely — this IS the support, and it is the one piece of the facade with a face.
 
-/* --- Sill: a window ledge, with the window itself above it. Dark glass, a mullion cross and a
-   little cold interior light — deliberately NOT the warm amber of the goal window, so the way out
-   stays the only warm thing below the roofline. */
-.ledge-sill::before {
-    content: '';
+   The art is a cloned `#gargoyleSprite` template (see index.html) rather than a pseudo-element, which
+   makes it the one ledge variant that breaks the ::before/::after budget. It had to: as a clip-path
+   outline filled with flat gradient bands it went through 46x26, then 66x42 with a brighter brow, and
+   still read as a pale wedge with two dots painted on it. A face needs real geometry.
+
+   Its placement is what keeps it legal, and it is the reason the head may not be moved: it is anchored
+   at the ledge's WALL end, and the slab above runs 110-190px out past it, so however far the spout
+   projects there is always slab overhead. Nothing here ever sticks into open air, which is what would
+   make it read as footing — the trap this level's art rules forbid below a slab. Anchor it at the OUTER
+   end of a ledge and that stops being true. */
+.gargoyle-sprite {
     position: absolute;
-    bottom: 100%;
-    height: 44px;
-    width: 58px;
-    background:
-        /* Mullion cross */
-        linear-gradient(90deg, transparent 0 27px, #322c25 27px 30px, transparent 30px),
-        linear-gradient(transparent 0 19px, #322c25 19px 22px, transparent 22px),
-        /* A pane catching a reflection of the sky, and the room behind going dark */
-        linear-gradient(150deg, rgba(150, 178, 214, 0.16) 0 34%, transparent 34%),
-        linear-gradient(#1a1d24 0%, #10121a 100%);
-    border: 3px solid #4a4238;
-    border-bottom: none;
-    box-sizing: border-box;
-    box-shadow: inset 0 0 10px rgba(0, 0, 0, 0.7);
+    top: 100%; /* hangs below the slab, where .ledge::after's corbel would be */
+    left: 0;
+    width: 66px;
+    height: 40px;
+    pointer-events: none;
 }
-.ledge-sill.ledge-left::before { left: 8px; }
-.ledge-sill.ledge-right::before { right: 8px; }
+.gargoyle-sprite svg { display: block; width: 100%; height: 100%; }
+/* One drawing, mirrored for the other wall — exactly like a pigeon's facing */
+.ledge-gargoyle.ledge-right .gargoyle-sprite { left: auto; right: 0; transform: scaleX(-1); }
+/* No stone corbel: the head is the bracket. Kept as an explicit suppression, because .ledge::after
+   would otherwise draw its own bracket straight through the sprite. */
+.ledge-gargoyle::after { content: none; }
+
+/* The `sill` variant used to live here: a window drawn above the slab, on the reasoning that the slab
+   was the window's own stone sill (hence `border-bottom: none` — the stone was meant to close it off).
+   It is gone, and the four ledges that used it are now plain stone. Two notes if it is ever rebuilt:
+   the missing bottom border is only honest while the window actually sits ON the slab, and a window
+   drawn by a ledge duplicates the `window` entity, which knows where it is in the wall and carries the
+   sweeper's camouflage. Wall furniture belongs on the wall, not on the thing you stand on. */
 
 /* --- Awning: stretched canvas, and the one ledge that is not stone. The slab itself is the taut
    fabric he lands on, so it gets the stripes; ::before is the shallow front valance and ::after the
@@ -1622,9 +1634,56 @@ button.secondary:hover { background: #1b1e2c; color: #aab3c4; }
     50% { box-shadow: inset 0 0 22px rgba(255, 186, 90, 0.55), 0 0 30px rgba(255, 176, 70, 0.40); }
 }
 
+/* --- A window in the facade. Pure masonry detail on its own (the `window` entity), and ALSO the
+   drawing the broom-sweeper hides behind — she is `.wall-window` plus a state hook, deliberately not
+   a lookalike, because "looks like an ordinary shuttered window until you are close" is the whole
+   ambush. One size for the whole facade for the same reason: a sweeper that were the only 50x64 window
+   in the level would be spotted on shape alone. Cold glass and a sky reflection, never warm — the goal
+   window is the only warm light below the roofline, and that is what makes the way out readable.
+
+   z-index 1 puts it above the wall (0) but behind anything bolted to the wall (.ledge is 2), so a
+   balcony railing crosses in FRONT of the glass, which is what a balcony actually looks like. Inside a
+   sweeper this is scoped to her own stacking context and does nothing. */
+.wall-window {
+    position: absolute;
+    width: 50px;
+    height: 64px;
+    box-sizing: border-box;
+    z-index: 1;
+    border: 3px solid #4a4238;
+    box-shadow: inset 0 0 10px rgba(0, 0, 0, 0.8);
+}
+/* The glass, listed once for both the window and the sweeper's swinging sash so the two can never
+   drift apart — her camouflage is only as good as their being the same drawing. */
+.wall-window,
+.sweeper-sash {
+    background:
+        /* Mullion cross, same language as the sill ledge's window */
+        linear-gradient(90deg, transparent 0 23px, #322c25 23px 26px, transparent 26px),
+        linear-gradient(transparent 0 28px, #322c25 28px 31px, transparent 31px),
+        /* A pane catching the sky, and the room behind it going dark */
+        linear-gradient(150deg, rgba(150, 178, 214, 0.14) 0 32%, transparent 32%),
+        linear-gradient(#1a1d24 0%, #100e12 100%);
+}
+/* Stone surround, same lintel-and-sill language as .sash-window. Both overhang the window's own box
+   into the wall, which is why a sweeper masks the figure with a SIBLING element rather than clipping
+   the window itself — see .sweeper-mask. */
+.wall-window::before {
+    content: '';
+    position: absolute;
+    left: -5px; right: -5px; top: -7px; height: 7px;
+    background: linear-gradient(#6f6657 0 3px, #4d453b 3px 100%);
+    box-shadow: 0 2px 3px rgba(0, 0, 0, 0.55);
+}
+.wall-window::after {
+    content: '';
+    position: absolute;
+    left: -6px; right: -6px; bottom: -6px; height: 6px;
+    background: linear-gradient(#776d5d 0 2px, #514840 2px 100%);
+}
+
 /* --- The broom-sweeper: an old woman who looks like a shuttered window until Bumbot gets close,
-   then leans out and swats him off the wall. Same stone surround as the sash-window checkpoint —
-   she's furniture in the same wall, not a separate thing bolted on.
+   then leans out and swats him off the wall. Her window IS a `.wall-window` — see above.
 
    ALL of her sits behind Bumbot, on the same layer as every other window in this wall, and the reason
    is structural rather than aesthetic: .sweeper-mask clips her to the window opening, so the figure is
@@ -1642,14 +1701,43 @@ button.secondary:hover { background: #1b1e2c; color: #aab3c4; }
 /* Mirrored for the other wall — on .sweeper rather than on .sweeper-rig, so that the mask's reach into
    the gap (below) mirrors with it and the whole thing stays authored once, for a left-hand wall. */
 .sweeper-right { transform: scaleX(-1); }
+/* Everything visual comes from .wall-window; this carries only what being a sweeper adds. Her window is
+   a real OPENING rather than a painted pane: the glass sits on .sweeper-sash, which swings out when she
+   leans through, and the box itself is the dark room behind. Idle, the sash covers it and she is
+   indistinguishable from the decorative windows down the facade. */
 .sweeper-window {
+    background: linear-gradient(#151319 0%, #0b0a0e 100%); /* the room, seen once the sash is open */
+    transition: background 0.35s ease-out;
+}
+/* A light on inside as she stirs. This is what makes her legible: her shape is near-black, so she has
+   to be a silhouette in a LIT opening — against an unlit room she was black on black, and only the
+   broom crossing the masonry outside the window could be seen at all.
+   COLD light, deliberately, and bright enough to read against a #3a3430 shawl. Warm would be the truer
+   colour for a room, but the goal window is the only warm light below this roofline and that is what
+   makes the way out readable from a long way up — so every other lit thing in the facade stays cold,
+   the same choice the sill ledges' windows make. */
+.sweeper.active .sweeper-window {
+    background: linear-gradient(#46596b 0%, #1e2630 100%);
+    /* Overrides .wall-window's near-black inset vignette, which would otherwise eat the light back off
+       the edges of the opening — a lit room glows at its reveals rather than darkening at them. Cold,
+       like the light itself. */
+    box-shadow: inset 0 0 12px rgba(96, 132, 170, 0.45);
+}
+/* The casement itself. Hinged on the wall side so it opens away from the gap, leaving the opening clear
+   exactly where her arm comes through, and swinging towards the viewer rather than sideways so it
+   foreshortens to a sliver instead of sticking out over the brickwork. inset 0 (not -3px) keeps the
+   stone reveal of .wall-window's border showing, which is what a decorative window shows too. */
+.sweeper-sash {
     position: absolute;
     inset: 0;
-    box-sizing: border-box;
-    border: 3px solid #4a4238;
-    background: linear-gradient(#1c1a20 0%, #100e12 100%);
-    box-shadow: inset 0 0 10px rgba(0, 0, 0, 0.8);
-    transition: background 0.3s ease-out;
+    z-index: 3; /* in front of the figure: it is the pane she is leaning past */
+    transform-origin: left center;
+    transform: perspective(220px) rotateY(0deg);
+    transition: transform 0.34s cubic-bezier(0.34, 1.2, 0.64, 1);
+    box-shadow: inset -2px 0 3px rgba(0, 0, 0, 0.5); /* the leading edge, once it is open */
+}
+.sweeper.active .sweeper-sash {
+    transform: perspective(220px) rotateY(-74deg);
 }
 /* Hides the figure while she is tucked away, and that is ALL it should do. Deliberately a sibling of
    .sweeper-window rather than overflow:hidden on .sweeper itself (or on the window) — either of those
@@ -1665,24 +1753,12 @@ button.secondary:hover { background: #1b1e2c; color: #aab3c4; }
     position: absolute;
     left: 0; right: -80px; top: 0; bottom: 0;
     overflow: hidden;
+    /* Above the window's own z-index 1, or the glass paints over the figure and she vanishes — which is
+       exactly what happened when .wall-window gained a z-index and this lost one. Only the broom, on the
+       part of the mask lying outside the window's box, stayed visible. Still inside .sweeper's stacking
+       context, so raising it cannot put her in front of Bumbot. */
+    z-index: 2;
     pointer-events: none;
-}
-/* Stone surround, same lintel-and-sill language as .sash-window */
-.sweeper-window::before {
-    content: '';
-    position: absolute;
-    left: -5px; right: -5px; top: -7px; height: 7px;
-    background: linear-gradient(#6f6657 0 3px, #4d453b 3px 100%);
-    box-shadow: 0 2px 3px rgba(0, 0, 0, 0.55);
-}
-.sweeper-window::after {
-    content: '';
-    position: absolute;
-    left: -6px; right: -6px; bottom: -6px; height: 6px;
-    background: linear-gradient(#776d5d 0 2px, #514840 2px 100%);
-}
-.sweeper.active .sweeper-window {
-    background: linear-gradient(#2a2620 0%, #1a1712 100%); /* a little warmer once she's stirring */
 }
 
 /* The figure. Two stacked blobs read as a bent back and a headscarf without needing real anatomy —

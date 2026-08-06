@@ -209,6 +209,85 @@
     </svg>
 </template>
 
+<!-- The gargoyle head under a `gargoyle` ledge, cloned once per such ledge by generateLevel(). Same
+     template-and-classes pattern as the birds, and for the same reason: there are several.
+
+     It is a sprite rather than the ::after pseudo-element it used to be because a clip-path outline
+     filled with flat gradient bands cannot carry a face — it went through "bigger" and "brighter" and
+     still read as a pale wedge with two dots painted on it. Authored for a LEFT-hand wall, wall at x=0
+     and the slab directly above y=0, so the head hangs under the slab and the spout projects out into
+     the gap; a right-hand ledge mirrors the whole thing, like a pigeon's facing.
+
+     It is a PROFILE, and that is the one thing not to undo. The head projects sideways out of the
+     wall, so it is seen side-on — which means ONE eye. The first cut of this sprite drew two equal
+     sockets side by side, a front-facing face on a side-facing head, and that mismatch was the whole
+     reason it read as broken however the values were pushed. The far eye is behind the muzzle; it is
+     not drawn.
+
+     Two more things carry the read at 66x40, where almost no detail survives:
+       * The mouth is OPEN — a concave notch bitten out of the silhouette, upper jaw over lower, with
+         a dark throat and a few worn fangs. A gargoyle is a waterspout, so the open jaw is the whole
+         point of the object; drawn as a slit along the underside (as it first was) the head loses its
+         one identifying feature and reads as a gator snout.
+       * The back third recedes into shadow. Held at the same mid-tone as the face it was just a slab
+         of stone with a face at one end, all of it competing for attention. Value does that work, not
+         silhouette — narrowing the wall end instead would make the head look like it was hanging off
+         the building rather than growing out of it. But the recession is floored: see the note on those
+         two paths, because taken to its natural extreme it makes the mount vanish into the masonry.
+
+     Carved limestone otherwise, so: flat chiselled planes and no curves, everything held inside ONE
+     silhouette path so no feature can float free of the head, and the value range kept narrow — only
+     the brow ridge and the top plane of the muzzle catch the city glow coming up out of the gap. The
+     eye is tiny and sits deep inside a wedge socket; enlarge it and it turns into a soft cartoon
+     animal instantly. The dark strip along the very top is the contact shadow against the slab's
+     underside, without which the lit skull runs straight into the slab's own stone and the
+     silhouette is lost. -->
+<template id="gargoyleSprite">
+    <svg viewBox="0 0 66 40" aria-hidden="true">
+        <g class="garg-all">
+            <!-- The head as one mass. The kink at 45,26.5 is the mouth: the outline runs back along the
+                 underside of the upper jaw and out again along the lower, so the open jaw is a notch in
+                 the silhouette rather than something painted on top of it. -->
+            <path d="M 0,0 L 30,0 L 38,3 L 42,10 L 40,14 L 62,25 L 64,29 L 45,26.5 L 57,34 L 54,37 L 40,34.5 L 26,37 L 12,34 L 0,29 Z"
+                  fill="#554e43"/>
+            <!-- The back of the skull falling away into the wall, in two steps. These are floored well
+                 above the wall's own value on purpose. The wall's gradient is LIGHTEST at its outer
+                 edge and darkens towards the gap; the head is the opposite way round, lit on the face
+                 it turns to the gap. Run the two to their natural extremes and they cross exactly at
+                 the mount, where the back plane came out at luminance 40 against masonry at 39 — the
+                 joint went invisible and the face read as floating with nothing behind it. The
+                 recession here is "less lit than the face", never "darker than the wall". -->
+            <path d="M 0,0 L 22,0 L 26,14 L 20,30 L 12,34 L 0,29 Z" fill="#4a4339"/>
+            <path d="M 0,0 L 10,0 L 12,16 L 8,32 L 0,29 Z" fill="#423b32"/>
+            <!-- Contact shadow against the underside of the slab -->
+            <path d="M 0,0 L 30,0 L 38,3 L 37.2,4.7 L 29.2,1.8 L 0,1.8 Z" fill="#201c18"/>
+            <!-- Horn, swept back along the skull and low, so the slab never clips it. Lit on top with a
+                 dark sliver beneath, or it reads as a flat plate lying on the head. -->
+            <path d="M 29,1.6 L 12,4.2 L 25,6.6 Z" fill="#6f6659"/>
+            <path d="M 25,6.6 L 12,4.2 L 13,5.6 L 25,7.8 Z" fill="#29241e"/>
+            <!-- Heavy brow ridge, thickest over the eye and tapering back. An even-width bar reads as
+                 the brim of a helmet. -->
+            <path d="M 22,6.4 L 41,9 L 42,12.8 L 24,8.4 Z" fill="#7d7364"/>
+            <!-- The socket as a chiselled wedge, widest under the brow, with the eye deep inside it -->
+            <path d="M 27,9 L 40,13 L 31,18.5 Z" fill="#171410"/>
+            <circle cx="31.8" cy="13.6" r="1.85" fill="#07060a"/>
+            <circle cx="31.0" cy="12.8" r="0.6" fill="#cbbda6" opacity="0.55"/>
+            <!-- Jaw and jowl, the underside in shadow -->
+            <path d="M 16,26 L 40,30.5 L 40,34.5 L 26,37 L 13,34.5 Z" fill="#2e2923"/>
+            <!-- Muzzle: the side plane, then the top plane catching the glow out of the gap -->
+            <path d="M 40,14.5 L 60.3,27.2 L 64,29 L 45,26.5 L 39,21 Z" fill="#4d463b"/>
+            <path d="M 40,14 L 62,25 L 60.3,27.2 L 39,16.5 Z" fill="#8a8071"/>
+            <ellipse cx="59.4" cy="25.3" rx="1.35" ry="0.8" fill="#17140f"/>
+            <!-- The throat behind the open jaw, painted rather than left transparent so the mouth stays
+                 dark over masonry as well as over the gap — and a few worn fangs. -->
+            <path d="M 45,26.5 L 63,28.9 L 56.6,33.6 Z" fill="#0f0d0b"/>
+            <path d="M 56.9,28.5 L 58.1,31.6 L 59.1,29.0 Z" fill="#b5aa96"/>
+            <path d="M 50.2,27.4 L 51.2,30.0 L 52.2,27.8 Z" fill="#a79d8a"/>
+            <path d="M 52.6,31.4 L 53.5,29.0 L 54.5,31.7 Z" fill="#9a917f"/>
+        </g>
+    </svg>
+</template>
+
 <!-- Load Game Logic Files. Order matters and there is no module system: each level file declares
      one global const, map.js collects them into LEVELS, then game.js consumes it. A new level
      needs its <script> tag here, above map.js. -->

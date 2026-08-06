@@ -12,7 +12,7 @@ Two levels, and they do not share a shape:
   rooftops with a checkpoint vent pipe at the midpoint. New scenery here must be *rooftop* — if a
   thing wouldn't plausibly be bolted to the top of a building, it doesn't belong up there.
 - **Level 2, `the-long-way-down`** — a 400×620 portrait you fall down: 4200px of masonry between
-  two buildings, zig-zagging balcony to gargoyle to sill, from the roof to a half-open second-floor
+  two buildings, zig-zagging balcony to gargoyle to bare ledge, from the roof to a half-open second-floor
   window, with the street lethal at the bottom. Scenery here is old stonework seen from *outside* a
   building.
 
@@ -133,26 +133,41 @@ equal specificity and replace both the blue safety edge and the truss/legs pseud
 
 The two pseudo-elements are budgeted, and every variant respects the split:
 
-- **`::before` — everything above the slab.** Balcony railing, sill window, awning valance.
-- **`::after` — everything below it.** Stone corbels, the gargoyle's head, awning struts.
+- **`::before` — everything above the slab.** Balcony railing, awning valance. This one needs `top: auto`,
+  which `.ledge::before` sets for every variant at once — see the note there. `.platform::before` sets
+  `top: 100%` for level 1's support legs, and a variant that adds `bottom: 100%` + a `height` without
+  clearing it leaves the position over-constrained, at which point CSS discards `bottom`. Every balcony
+  railing in level 2 was drawn *under* its slab for exactly this reason.
+- **`::after` — everything below it.** Stone corbels, awning struts.
 
-Only the 15px slab is solid, so **nothing either pseudo-element draws may look like footing or like a
+Only the 15px slab is solid, so **nothing drawn above or below it may look like footing or like a
 wall** — the same trap level 1's support legs had to avoid.
+
+The **one exception is a balcony railing's gap-facing end**, which really is solid: `generateLevel()`
+emits a `rail` collider there so Bumbot cannot stroll off a balcony without getting over the iron
+first. That is the only place in either level where painted detail above a slab collides, and it is
+deliberate — the railing is drawn to be climbed. Everything else above or below a slab is still paint.
+
+The one exception to the budget is the `gargoyle`, whose head is a cloned SVG template appended as a
+child (`.gargoyle-sprite`). Painted detail cannot carry a face at this size — it is the same reason
+Bumbot and the birds stopped being emoji — so that variant spends a real element and uses its `::after`
+only to suppress the default corbel. Reach for this only when a variant genuinely needs *geometry*; two
+gradient-stack pseudo-elements are still the right budget for stonework.
 
 | Variant | What it is |
 |---|---|
-| `balcony` | Wrought-iron railing over stone. The strongest "someone lives here" cue in the level. |
-| `gargoyle` | A carved head on a short bracket, replacing the corbel — the one piece of the facade with a face. |
-| `sill` | A window ledge with the window above it: dark glass, mullion cross, cold interior light. |
+| `balcony` | Wrought-iron railing over stone, 26px tall. The strongest "someone lives here" cue in the level, and the only variant with **collision of its own**: the gap-facing end is a solid `rail`, so leaving a balcony costs a jump. `railHeight` in `game.js` must match the CSS height or the barrier stops matching the iron you can see. |
+| `gargoyle` | A carved head on a short bracket, replacing the corbel — the one piece of the facade with a face. The **only variant whose art is a cloned sprite** (`#gargoyleSprite`) rather than a pseudo-element, because a face needs real geometry; `.ledge-gargoyle::after` exists purely to suppress the default corbel. Anchored at the ledge's **wall** end, with 110–190px of slab above it, so the spout never projects into open air — anchored at the outer end it would read as footing. Drawn in **profile with one eye and an open jaw** — see the sprite's own header comment, because both of those are load-bearing and both were wrong first time. |
 | `awning` | Stretched canvas, the only non-stone ledge. Striped slab, scalloped valance, iron struts. |
 
 Periodic pattern is *correct* for the railing balusters and the awning stripes — real railings and
 awnings are evenly spaced. That is the same distinction level 1 draws between a pillar's face (never
 periodic) and an AC unit's louvres (rightly periodic).
 
-The wall faces themselves carry **no window rows** on purpose: the sills and the two portals draw the
-windows, because they know where they actually are. Adding rows to the wall put them behind ledges at
-random offsets.
+The wall faces themselves carry **no window rows** on purpose: the `window` entities and the two portals
+draw the windows, because they know where they actually are. Adding rows to the wall put them behind
+ledges at random offsets. A ledge should not draw one either — the retired `sill` variant did, and a
+window attached to the thing you stand on cannot know what is around it.
 
 ## Coordinate system (the main thing to get right)
 
@@ -242,11 +257,21 @@ record (`{...obj, dom, active}`); `level.birds` become `BirdEntities`.
   service catwalk: `::after` is the under-truss, `::before` the support legs, both masked to
   fade downward — only the 15px slab collides, so the legs must never look solid.
   In a vertical level the same type is a **ledge**: `side: 'left'|'right'` says which wall it grows
-  out of and `variant` (`balcony` / `gargoyle` / `sill` / `awning`) picks the stonework. Those add
+  out of and `variant` (`balcony` / `gargoyle` / `awning`, or omitted for a bare stone ledge) picks the
+  stonework. Those add
   `.ledge`, `.ledge-<side>` and `.ledge-<variant>`, declared *after* `.platform` in the stylesheet
   so they win on equal specificity and replace both the blue safety edge (level 1's "static
   platform" cue, meaningless here) and the truss/legs pseudo-elements with stone corbels. Collision
-  is identical — it is the same 15px slab either way.
+  is identical — it is the same 15px slab either way, *except* for a `balcony`, which also gets a
+  `rail`.
+- `rail` — the solid outer end of a balcony railing. **Not placed in level data**: `generateLevel()`
+  derives one from every `variant: 'balcony'` platform, at whichever end faces the gap (the right-hand
+  end on a left wall, the left-hand end on a right wall). It has **no DOM** — `.ledge-balcony::before`
+  already paints that end, so it is collision only, and nothing about it needs `.level-entity`. It is
+  the first entity to use `solidMinY`, which lifts a collision box off the ground: its `height` still
+  means "top surface" like a pillar's, which is what lets the landing branch stand him on top of it
+  with no special case. Being standable is intentional; it is 6px wide, so perching is rare and looks
+  odd but is legal.
 - `mover` — a platform that oscillates. `axis: 'x'` slides between `baseX` and
   `baseX + range`; `axis: 'y'` raises between `baseHeight` and `baseHeight + range`. The axis
   also picks the machinery class (`mover-x` = gondola on cables, `mover-y` = hoist on a mast).
@@ -266,6 +291,13 @@ record (`{...obj, dom, active}`); `level.birds` become `BirdEntities`.
   scenery: absent from `isSolidType()`/`isSlabType()`, from the meow sweep and from
   `handleOverlapSystems()`. One sits at the level spawn so Bumbot's arrival matches his
   respawns.
+- `window` — pure scenery: a window in the masonry (`.wall-window`), absent from `isSolidType()`/
+  `isSlabType()`, from the meow sweep and from `handleOverlapSystems()`. The same "decorative twin of a
+  real thing" arrangement as `pipe` is to `portal` — and here the twin is load-bearing, because a
+  `sweeper`'s window **is** a `.wall-window`. Its size is fixed in CSS rather than read from the data:
+  every window in a facade has to be the same one, or the sweeper is identifiable on shape alone. Cold
+  glass only, never warm; the goal window is the one warm light below the roofline. z-index 1 puts it
+  behind anything bolted to the wall, so a balcony railing crosses in front of the glass.
 - `sweeper` — level 2's ambush hazard: an old woman who looks like a shuttered window
   (`.sweeper`/`.sweeper-window`, same lintel-and-sill stone as `.sash-window`) until Bumbot enters
   her proximity zone, then leans out and swats. `side` picks the wall exactly like a ledge's, and
@@ -282,15 +314,15 @@ record (`{...obj, dom, active}`); `level.birds` become `BirdEntities`.
 
   **Placing one is where she goes wrong**, and both failures are silent — she runs her whole
   animation and simply never connects. Her lethal rectangle is her window's own box grown out by
-  `sweeperReach`, so: mount her `x` at the wall's **inner** face (`wallWidth - sweeperWidth`, not 0,
-  or she is set into the far side of her own building and sweeps 60px of brick), and mount her `y`
-  just above the ledge she guards, because the band is her window's vertical span — a window mounted
-  a comfortable 75px up cannot reach a 45px cat standing below it, at any x, on any frame. `reach`
-  must span that ledge edge to edge too; stopping short leaves a safe pocket at the outer lip, which
-  is exactly where he stands to drop. The telegraph gets its air time from `sweeperDetectVPad`, and
-  that pad wants to stay *small* — pad it generously and she burns the whole telegraph while he is
-  still falling, so the broom turns lethal on the frame he lands, which is unavoidable rather than
-  hard.
+  `sweeperReach`, so: mount her `x` where the stroke lands where you want it (her reach is measured from
+  it — at 0 on a 110px-wide wall she is set into the far side of her own building and sweeps 60px of
+  brick), and mount her `y` just above the ledge she guards, because the band is her window's vertical
+  span — a window mounted a comfortable 75px up cannot reach a 45px cat standing below it, at any x, on
+  any frame. How much of the ledge is threatened is an `x` decision, not a `reach` one: level 2 leaves
+  the outer ~35px unswept on purpose, so there is a pocket to land in and watch her swipe short. The
+  telegraph gets its air time from `sweeperDetectVPad`, and that pad wants to stay *small* — pad it
+  generously and she burns the whole telegraph while he is still falling, so the broom turns lethal on
+  the frame he lands, which is unavoidable rather than hard.
 
   Mounting her where she can reach also means she **overlaps Bumbot**, and all of her belongs *behind*
   him, at z-index 5 with the other windows in this wall. That is structural, not aesthetic:
@@ -299,6 +331,18 @@ record (`{...obj, dom, active}`); `level.birds` become `BirdEntities`.
   into his space", which is true of her hitbox and not of her drawing. z-index 12 on the whole element
   put her window over him; splitting the window behind and the figure in front left him sandwiched
   between two halves of one object.
+
+  Her window is a real **opening**, not a painted pane: the glass sits on a `.sweeper-sash` child that
+  swings out on `.active`, and the window box itself is the dark room behind it. Idle, the sash covers
+  the opening and she is indistinguishable from the decorative `window` entities down the facade. Two
+  layering rules hold inside her: `.sweeper-mask` must sit **above** `.wall-window`'s z-index 1 or the
+  glass paints over the figure (which is what happened when the shared window drawing gained a z-index
+  and the mask lost one — only the broom, on the part of the mask outside the window's box, stayed
+  visible), and the sash sits above the mask, because it is the pane she leans past.
+
+  She also needs a **lit** interior on `.active`, or she is black on black: she reads as a silhouette in
+  a lit opening, not as a drawn figure. That light is **cold**, like the `window` entities' glass — the goal
+  window keeps the only warm light below this roofline.
 
   That mask is also the thing that has to grow when `sweeperReach` does. It clipped at the window's own
   box, so the outer 21px of the swing — the part crossing the ledge he stands on — was invisible while
@@ -386,7 +430,8 @@ species needs its own collision code. `generateLevel()` adds `.bird` plus `.pige
 the stylesheet keys both the artwork and the lighting off the species class.
 
 **Nothing here is an emoji any more.** Each bird is a clone of a `<template>` at the bottom of
-`index.html` — `#pigeonSprite` or `#crowSprite` — a template rather than a live node because there
+`index.html` — `#pigeonSprite` or `#crowSprite`, alongside `#gargoyleSprite` which a `gargoyle` ledge
+clones the same way — a template rather than a live node because there
 are many of them, and their parts carry **classes** (`.pig-head`, `.crw-wing-near`, …) rather than
 ids for the same reason. Real pigeon greys with a warm beak and feet and a visible
 eye, wearing only Bumbot's rim light: the `brightness(0) invert()` flattening that a glyph needed
@@ -452,6 +497,19 @@ Speed lives in the tunables block at the top of `game.js`. Jump apex is
 constants must be rebalanced together — bumping `gravity` alone makes platforms
 unreachable, and it invalidates **both** level files' design budgets (level 2's ledge spacing is
 derived from fall time against jump distance).
+
+That 141px is the **held** jump. Releasing the key while still rising clips the climb to
+`jumpCutSpeed` (7.5, ≈ 35px apex) — handled in `keyup`, not in the physics step, and applied only
+while `velocityY > jumpCutSpeed` so it can never brake a fall or fight the launch impulse. Level 1
+never notices, because its tall platforms are cleared by holding.
+
+It exists for level 2's balcony rails. With a single fixed impulse, a mandatory jump off a balcony
+launched him the full 141px and roughly doubled his airtime — a ~158px walk-off became a ~337px arc
+across gaps needing only 55-145px, which is not what either level file's reach budget describes. A tap
+now clears the 26px railing by ~9px, with ~67px of horizontal room to pass the 6px collider, and lands
+around 237px. It is a **ceiling rather than a multiplier** on purpose: the shortest possible hop is the
+same height however early the key comes up, so minimum clearance over a railing is a fixed number
+instead of a function of reaction time.
 
 `update()` early-returns when `gameActive === false`, which **terminates the loop
 entirely** — whoever cleared the flag must restart it with `requestAnimationFrame(update)`
