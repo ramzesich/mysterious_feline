@@ -598,8 +598,35 @@ function generateLevel() {
             // data, because every window in the facade has to be the same one for the sweeper to hide
             // among them.
             element.classList.add('wall-window');
+            // An optional second drawing at the SAME 50x64 proportions. Safe for the sweeper's
+            // camouflage only as long as the plain drawing stays the common one — she is a plain
+            // `.wall-window`, so if variants ever outnumber it she becomes the odd window out.
+            if (obj.variant) element.classList.add('wall-window-' + obj.variant);
             element.style.left = obj.x + 'px';
             element.style.bottom = (40 + obj.y) + 'px';
+        } else if (obj.type === 'downpipe' || obj.type === 'ladder' || obj.type === 'laundry') {
+            // The three pieces of wall furniture that are neither window nor ledge. All pure scenery:
+            // absent from isSolidType()/isSlabType(), from the meow sweep and from
+            // handleOverlapSystems(), exactly like `window`.
+            //
+            // Each is sized from the DATA rather than from CSS, which is the opposite of a `window`.
+            // A window is fixed in CSS because every window has to be the identical drawing or the
+            // sweeper stops hiding among them; these have no twin to match, and a downpipe that cannot
+            // choose its own length is useless — running the height of the masonry is the whole point.
+            element.classList.add(obj.type === 'downpipe' ? 'downpipe'
+                                : obj.type === 'ladder'   ? 'fire-ladder'
+                                                          : 'laundry-line');
+            element.style.left = obj.x + 'px';
+            element.style.bottom = (40 + obj.y) + 'px';
+            if (obj.type === 'laundry') {
+                // A rope is measured across; the two vertical ones are measured up.
+                element.style.width = obj.width + 'px';
+            } else {
+                element.style.height = obj.height + 'px';
+            }
+            // Which way a ladder's broken bottom hangs, and which way a rope sags towards. Mirrored
+            // like a pigeon's facing, so each is authored once.
+            if (obj.side) element.classList.add(obj.type + '-' + obj.side);
         } else if (obj.type === 'sweeper') {
             // A window that looks shuttered until Bumbot gets close, then leans an old woman and
             // her broom out of it. `side` says which wall — and which way the broom swings, into

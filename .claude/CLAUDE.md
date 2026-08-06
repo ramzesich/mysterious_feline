@@ -298,6 +298,45 @@ record (`{...obj, dom, active}`); `level.birds` become `BirdEntities`.
   every window in a facade has to be the same one, or the sweeper is identifiable on shape alone. Cold
   glass only, never warm; the goal window is the one warm light below the roofline. z-index 1 puts it
   behind anything bolted to the wall, so a balcony railing crosses in front of the glass.
+  Optional `variant` picks a second drawing at the **same 50x64 opening** — currently only `scullery`,
+  which goes above a laundry line: six small panes instead of four, and the sash pushed up so the bottom
+  is dark and open, which is what ties it to the rope below. A window over a washing line is the point;
+  washing on a blank wall looks unexplained. This is safe for the sweeper **only while the plain drawing
+  stays the common one** (8 plain against 2 scullery today) — she hides by being an ordinary window, so
+  if variants ever outnumber the plain one she becomes the odd window out.
+- `downpipe` / `ladder` / `laundry` — level 2's wall furniture, all pure scenery: absent from
+  `isSolidType()`/`isSlabType()`, from the meow sweep and from `handleOverlapSystems()`, exactly like
+  `window`. Sized from the **data** rather than from CSS, which is the opposite of a `window` (a window
+  is CSS-fixed so the sweeper can hide among identical ones; these have no twin to match, and a
+  downpipe that cannot choose its own length is pointless). All three sit at z-index 1 beside
+  `.wall-window`, so ledges cross in front of them.
+  Each one's *shape* is doing safety work, because nothing in this level may look like footing unless
+  it is a 15px slab: the pipe is vertical so it presents no horizontal line; the ladder is **broken**,
+  its lower rungs replaced by two snapped stubs, because an intact ladder in a game with no climbing is
+  an offer the player can't take; the rope **sags** and carries washing, so it never shows the flat
+  pale-topped edge every real ledge has.
+  Both `ladder` and `downpipe` take `side` to mirror. On a pipe it picks which way both **knees** turn:
+  each end of a run bends a right angle into the masonry, because cut off square it reads as a length of
+  pipe lying on the wall rather than as plumbing. The elbow is a **true 90° on screen** — barrel vertical,
+  arm horizontal — and the **45° lives in depth**, the arm turning away from the viewer into the wall.
+  Drawing that as a literal diagonal is wrong and was tried: a diagonal depicts a pipe bending 45° *along
+  the face* of the wall, a bend no plumber would make, and at this size it reads as a snapped-off stub.
+  The depth comes from a perspective taper (far end shallower than the joint), the arm falling into shadow
+  as it turns away from the gap, and keeping the projection short — 12px against a 9px barrel. The knees
+  turn *away* from the gap on purpose: one turning out into open air would be a spout, and a spout wants
+  something underneath it. The right wall is written out explicitly rather than mirrored with
+  `scaleX(-1)`, because flange, shadow ramp and taper each have a handedness.
+  A pipe is also **quieter than it first was**: the barrel highlight came down from luminance ~101 to ~76
+  against a wall that runs 39 at its outer face down to 11 at the gap. Cast iron on soot-stained stone is
+  a near-value relationship, and the first cut read as chrome.
+  Ropes run **along** a wall, not across the gap. The spanning version was tried and dropped — it is the
+  iconic arrangement, but a near-horizontal line across the shaft is the one silhouette here that reads
+  as something to land on, and the middle of the span had no ledge under it, so reaching for it was
+  simply a fall.
+  Placement is nearly forced and worth reading the level data's note on: windows and gargoyle sprites
+  already claim x 14-76 and x 0-66 on the left wall and x 306-368 and x 334-400 on the right, leaving
+  only x 76-110 and x 270-306 clear — both at the walls' inner faces, which is where a light well's
+  pipework belongs anyway.
 - `sweeper` — level 2's ambush hazard: an old woman who looks like a shuttered window
   (`.sweeper`/`.sweeper-window`, same lintel-and-sill stone as `.sash-window`) until Bumbot enters
   her proximity zone, then leans out and swats. `side` picks the wall exactly like a ledge's, and

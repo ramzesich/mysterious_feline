@@ -1682,6 +1682,223 @@ button.secondary:hover { background: #1b1e2c; color: #aab3c4; }
     background: linear-gradient(#776d5d 0 2px, #514840 2px 100%);
 }
 
+/* ===== Wall furniture: the things bolted to the masonry that are neither window nor ledge. All three
+   are pure scenery with no collision at all, and all three share one hard constraint — in this level
+   NOTHING may look like footing unless it is a 15px slab. That rules the shape of each of them:
+
+     * the downpipe is vertical, so there is no horizontal line to mistake for a ledge;
+     * the ladder is BROKEN, with its lower rungs missing, so it cannot be read as a way up;
+     * the rope SAGS and carries washing, so it never presents the flat line a slab does.
+
+   Real footing in this level is always the same object: a 15px stone bar with a pale lit top edge.
+   Keep these three as far from that description as possible and the read stays unambiguous.
+
+   All sit at z-index 1, alongside .wall-window — in front of the wall (0) but behind every ledge (2,
+   or 11 for a balcony), so a pipe passes behind a balcony the way a real one passes behind ironwork. */
+.downpipe,
+.fire-ladder,
+.laundry-line {
+    position: absolute;
+    z-index: 1;
+    pointer-events: none;
+}
+
+/* --- Downpipe: cast iron, running down the masonry. The safest of the three by construction — a
+   vertical line cannot be stood on — and the biggest single win against an empty wall, because it is
+   the only decoration here that can run hundreds of px and tie storeys together.
+   Round section is faked with a horizontal value ramp: dark edge, mid, a narrow highlight where it
+   turns towards the gap, then falling away. The socket collars ARE periodic, and rightly so — cast
+   pipe comes in fixed lengths and every joint is the same distance apart, the same argument that makes
+   the railing balusters and the awning stripes periodic rather than sloppy. */
+.downpipe {
+    width: 9px;
+    background:
+        /* Socket collars every 74px: a shadow line, the raised band, another shadow */
+        repeating-linear-gradient(
+            transparent 0 68px,
+            rgba(0, 0, 0, 0.55) 68px 69px,
+            #554f45 69px 73px,
+            rgba(0, 0, 0, 0.45) 73px 74px),
+        /* The barrel, lit down the edge that faces out into the gap */
+        linear-gradient(90deg,
+            #1f1d1a 0 1px, #35312b 1px 3px, #514b41 3px 5px, #38332d 5px 7px, #201e1b 7px 9px);
+    box-shadow: 1px 0 3px rgba(0, 0, 0, 0.55);
+}
+/* The knees. A run of pipe has to arrive from somewhere and go somewhere — cut off square at both ends
+   it reads as a length of pipe lying on the wall rather than as plumbing, which is exactly how the
+   first cut looked. So each end turns a right angle and disappears into the masonry, with a flange
+   where it enters.
+
+   The elbow is a TRUE 90° on screen: the barrel stays vertical, the arm stays horizontal, and neither
+   is drawn on a slant. The 45° lives in DEPTH — the arm is turned away from the viewer, into the wall.
+   Drawing that as a literal diagonal was tried and is wrong: a diagonal depicts a pipe bending 45°
+   *along the face* of the wall, which is a bend no plumber would make, and at this size it just reads
+   as a snapped-off stub.
+
+   On a flat side view the depth has to come from foreshortening and shading instead, so:
+     * a perspective TAPER — the far end is fractionally shallower than the end welded to the barrel;
+     * the arm falling into SHADOW as it turns away from the light coming up out of the gap;
+     * the arm kept short, 12px of projection against a 9px barrel, because a run going away from you
+       covers less ground than one crossing in front of you.
+
+   The knee turns away from the gap, deeper into the building. One turning out into open air would be a
+   spout, and a spout wants something underneath it.
+   Authored for a LEFT-hand wall; the right wall is written out explicitly below rather than mirrored,
+   because the flange, the shadow ramp and the taper all have a handedness and a scaleX(-1) stacked on
+   top of three of those is easy to get backwards. */
+.downpipe::before,
+.downpipe::after {
+    content: '';
+    position: absolute;
+    right: 0;
+    width: 21px; /* 12px of it projects past the 9px barrel */
+    height: 9px;
+    background:
+        /* Falling away into shadow towards the wall */
+        linear-gradient(90deg, rgba(0, 0, 0, 0.52) 0 4px, rgba(0, 0, 0, 0.20) 9px, transparent 15px),
+        /* The flange where the arm meets the stone, at its far end */
+        linear-gradient(90deg, #5a5349 0 3px, rgba(0, 0, 0, 0.55) 3px 4px, transparent 4px),
+        /* The arm: the same round-section value ramp as the barrel, turned on its side */
+        linear-gradient(#1f1d1a 0 1px, #35312b 1px 3px, #514b41 3px 5px, #38332d 5px 7px, #201e1b 7px 9px);
+    /* Far end (0%) shallower than the joint (100%) — the foreshortening that says "going away" */
+    clip-path: polygon(0% 15%, 100% 0%, 100% 100%, 0% 85%);
+}
+.downpipe::before { top: 0; }
+.downpipe::after { bottom: 0; }
+/* Right-hand wall: the arm runs the other way, so flange, shadow ramp and taper all flip. */
+.downpipe-right::before,
+.downpipe-right::after {
+    right: auto;
+    left: 0;
+    background:
+        linear-gradient(90deg, transparent 6px, rgba(0, 0, 0, 0.20) 12px, rgba(0, 0, 0, 0.52) 17px 21px),
+        linear-gradient(90deg, transparent 0 17px, rgba(0, 0, 0, 0.55) 17px 18px, #5a5349 18px 21px),
+        linear-gradient(#1f1d1a 0 1px, #35312b 1px 3px, #514b41 3px 5px, #38332d 5px 7px, #201e1b 7px 9px);
+    clip-path: polygon(0% 0%, 100% 15%, 100% 85%, 0% 100%);
+}
+
+/* --- Fire ladder: bolted to the wall and BROKEN. The break is the whole design, not a flourish. A
+   sound ladder in a level about falling is an offer to climb, and this game has no climbing — worse,
+   it is the exact "looks like footing but is not" trap the facade's art rules exist to prevent. So the
+   rungs stop partway down and two snapped stubs are left behind, which reads as a way up that was cut
+   off long ago rather than as a way up the player is failing to use.
+   Rusted iron, warmer than the limestone around it, so it reads as metal rather than as more stone. */
+.fire-ladder {
+    width: 22px;
+    /* The two stiles run the full height — they are what says "ladder" once the rungs give out */
+    background:
+        linear-gradient(90deg,
+            #4e4034 0 1px, #6b5947 1px 3px, #2e251e 3px 4px,
+            transparent 4px 18px,
+            #2e251e 18px 19px, #6b5947 19px 21px, #4e4034 21px 22px);
+    filter: drop-shadow(1px 1px 1px rgba(0, 0, 0, 0.7));
+}
+/* Rungs, in the upper 60% only. Below that the ladder is gone. */
+.fire-ladder::before {
+    content: '';
+    position: absolute;
+    left: 3px;
+    right: 3px;
+    top: 0;
+    height: 60%;
+    background: repeating-linear-gradient(
+        transparent 0 15px,
+        #6b5947 15px 16px,
+        #34291f 16px 17.5px,
+        transparent 17.5px 19px);
+}
+/* The two snapped stubs at the break, one longer than the other so it reads as a tear rather than a
+   cut. Sitting just below where the rungs stop is what makes the missing ones legible as missing. */
+.fire-ladder::after {
+    content: '';
+    position: absolute;
+    left: 3px;
+    top: 60%;
+    width: 7px;
+    height: 20px;
+    background:
+        linear-gradient(transparent 0 3px, #5e4d3d 3px 4px, #2a211a 4px 5px, transparent 5px 14px),
+        linear-gradient(90deg, #5e4d3d 0 2px, transparent 2px);
+}
+.ladder-right::after { left: auto; right: 3px; transform: scaleX(-1); }
+
+/* --- Laundry line: a rope with washing on it, and the one piece of scenery here that says somebody is
+   home more plainly than a lit window does.
+   Both ropes run ALONG a wall face, strung between two brackets. A version spanning the gap between the
+   buildings was tried and dropped: it is the iconic arrangement, but a near-horizontal line across the
+   shaft is the one silhouette that can be mistaken for something to land on, and sag alone does not fix
+   that when the middle of the span has no ledge under it. Along a wall the question never arises.
+   Even so the SAG is still doing work, because a taut line is a slab's silhouette: it is drawn as a
+   curve, thin, with cloth breaking it up. Nothing here presents the flat pale-topped edge that every
+   real ledge in the level has.
+   The element box is the whole bounding area; the rope is ::before along its top and the washing ::after
+   hanging under it. Width comes from the data. */
+.laundry-line {
+    height: 38px;
+}
+.laundry-line::before {
+    content: '';
+    position: absolute;
+    left: 0;
+    right: 0;
+    top: 0;
+    height: 13px;
+    border-bottom: 2px solid #8d8578;
+    /* An elliptical bottom radius is a good enough catenary at this size */
+    border-radius: 0 0 46% 46% / 0 0 100% 100%;
+    /* A bracket at each end. Without them the rope tapers away into the masonry and reads as a crack in
+       the render rather than as something somebody tied up. */
+    background:
+        linear-gradient(#7d766a, #4a443c) no-repeat left top / 3px 11px,
+        linear-gradient(#7d766a, #4a443c) no-repeat right top / 3px 11px;
+}
+/* The washing. Two repeating gradients on DELIBERATELY coprime periods (37 and 53), so the pegging
+   never locks into an obvious rhythm — the same trick the skyline layers use to stop reading as
+   wallpaper. Evenly pegged washing is realistic; a visible 1-2-1-2 repeat is not.
+   Colours stay cool and desaturated: the goal window owns the only warm light below this roofline, and
+   a row of warm laundry halfway up the shaft would compete with the one thing that has to stay
+   readable from a long way up. */
+.laundry-line::after {
+    content: '';
+    position: absolute;
+    left: 4px;
+    right: 4px;
+    top: 9px;
+    height: 26px;
+    background:
+        repeating-linear-gradient(90deg,
+            transparent 0 6px, #6e6a63 6px 19px, transparent 19px 37px),
+        repeating-linear-gradient(90deg,
+            transparent 0 24px, #565a61 24px 33px, transparent 33px 53px);
+    /* Hems soften downward, and the sag means the ends hang higher than the middle */
+    -webkit-mask-image: linear-gradient(rgba(0, 0, 0, 0.95) 0 62%, transparent 100%);
+    mask-image: linear-gradient(rgba(0, 0, 0, 0.95) 0 62%, transparent 100%);
+}
+
+/* --- Scullery window: the one the washing came out of, so it goes above a laundry line. Same 50x64 box
+   and the same stone lintel and sill as every other window — only the glazing differs, which is the
+   whole point: a back-stairs window in the same building would be built to the same opening size and
+   just cheaper inside.
+   Six small panes instead of four large ones, and the bottom of it is dark and open rather than glazed,
+   because somebody pushed the sash up to reach the rope. That open gap is what ties it to the rope
+   below; a fully glazed window over a washing line looks like a coincidence.
+   Still cold, still never warm — the goal window keeps the only warm light below this roofline.
+
+   This must stay the MINORITY drawing. The sweeper hides by being an ordinary `.wall-window`, so the
+   plain version has to remain the one you stop noticing: 8 plain against 2 of these. */
+.wall-window-scullery {
+    background:
+        /* One vertical mullion, two transoms — six panes */
+        linear-gradient(90deg, transparent 0 23px, #322c25 23px 26px, transparent 26px),
+        linear-gradient(transparent 0 18px, #322c25 18px 21px, transparent 21px),
+        linear-gradient(transparent 0 36px, #322c25 36px 39px, transparent 39px),
+        /* The sash pushed up: open dark below it, and the head of the lower sash as a bar */
+        linear-gradient(transparent 0 48px, #443c31 48px 51px, #0a0a0e 51px 100%),
+        /* A pane catching the sky, and the room behind going dark */
+        linear-gradient(150deg, rgba(150, 178, 214, 0.13) 0 30%, transparent 30%),
+        linear-gradient(#1a1d24 0%, #100e12 100%);
+}
+
 /* --- The broom-sweeper: an old woman who looks like a shuttered window until Bumbot gets close,
    then leans out and swats him off the wall. Her window IS a `.wall-window` — see above.
 

@@ -227,19 +227,88 @@ const LEVEL_2 = {
         // `y` is the ledge's slab top + 10 throughout, matching hers, which puts the window's stone
         // sill just clear of the slab. On a balcony the 18px railing then crosses the bottom of the
         // glass, which is what a balcony looks like — z-index 1 keeps the glass behind it.
-        // `x` stays inside the wall's own footprint: 0..60 on the left, 270..350 on the right.
+        // `x` is ONE value per wall — 20 on the left, 312 on the right — so every window on a face lines
+        // up in a single vertical bay, which is how a real building is built. They used to be scattered
+        // across 24px on the left and 18px on the right, which read as sloppy rather than as variety, and
+        // the outlier at x=38 pushed its stone sill 4px into the downpipe.
+        // The left value is 20 because that is the SWEEPER's x, and hers is not free — it is tuned so her
+        // stroke dies short of the ledge's outer lip. So the windows align to her rather than the other
+        // way round, which makes her camouflage better than it was: before, she was the only window on
+        // the wall at x=20.
+        // Both values also have to clear the wall furniture. A window's stone surround runs 6px past its
+        // box each side, so x=20 spans 14-76 against the left pipe's knee at 78, and x=312 spans 306-368
+        // against the right pipe's knee ending at 297.
         //
         // The un-windowed third is chosen, not left over: both awnings (canvas belongs over a shop
         // front, not under a bedroom) and the whole bottom of the shaft — below 780 there is nothing
         // but the goal window, so it stays the only lit thing down there.
-        { type: 'window', x: 300, y: 3970 },  // over the first balcony
-        { type: 'window', x: 318, y: 3630 },
-        { type: 'window', x: 22,  y: 3390 },
-        { type: 'window', x: 38,  y: 3085 },
-        { type: 'window', x: 18,  y: 2670 },
+        { type: 'window', x: 312, y: 3970 },  // over the first balcony
+        { type: 'window', x: 312, y: 3630 },
+        { type: 'window', x: 20,  y: 3390 },
+        { type: 'window', x: 20,  y: 3085 },
+        { type: 'window', x: 20,  y: 2670 },
         { type: 'window', x: 312, y: 2525 },
-        { type: 'window', x: 14,  y: 1175 },
-        { type: 'window', x: 306, y: 1035 }
+        { type: 'window', x: 20,  y: 1175 },
+        { type: 'window', x: 312, y: 1035 },
+
+        // === Wall furniture. Pure scenery like the windows, and the answer to a facade whose ledges
+        // had four looks while the masonry between them had none.
+        //
+        // WHERE THEY CAN GO IS ALMOST FULLY DETERMINED, which is worth knowing before moving one. The
+        // windows sit in one bay per wall — x 14-76 on the left including their stone surrounds, and
+        // x 306-368 on the right — and the gargoyle sprites take x 0-66 and 334-400. That leaves exactly
+        // two clear vertical strips: x 76-110 and x 270-306 — both at the walls' INNER faces, looking
+        // into the gap. That is lucky rather than awkward: a downpipe and a fire escape belong on the
+        // light-well elevation of a building, not on its street front.
+        //
+        // Spacing follows the same rule as the gargoyles, applied PER TYPE: no two of a kind on the
+        // same wall close enough to share a 620px frame. Each type here has one per wall, so the rule
+        // is satisfied by construction.
+        //
+        // Two long pipe runs, on opposite walls and in opposite halves of the shaft. Length is the
+        // point — they are the only decoration that can tie storeys together, so they are what stops
+        // the wall reading as one flat surface for 4000px.
+        // `side` is which wall, and it decides which way BOTH knees turn: a pipe run has to arrive from
+        // somewhere and go somewhere, so each end bends into the masonry rather than stopping in mid-air.
+        // The elbow is a true right angle on screen; the 45° turn into the wall is carried by
+        // foreshortening and shading, not by drawing a diagonal (see .downpipe::before in style.css).
+        // Each knee projects 12px past the barrel, so a pipe needs that much wall beside it — which is
+        // why these sit at x 90 and x 276 rather than hard against the walls' inner faces.
+        // The bottom of the left run also had to move up from 2680 to 2720: the balcony at 2645 carries
+        // its railing to 2686, and at z-index 11 against a pipe's 1 that railing painted over the lower
+        // 6px of the knee, hiding part of the one detail that stops the run ending in mid-air.
+        { type: 'downpipe', x: 90,  y: 2720, height: 1140, side: 'left' },
+        { type: 'downpipe', x: 276, y: 560,  height: 1120, side: 'right' },
+
+        // The ladders are BROKEN — see .fire-ladder in style.css. Short runs, deliberately: a long one
+        // starts to look like a route, and there is no climbing in this game. Each one ends in mid-air
+        // with two snapped stubs, which is what makes it scenery rather than a promise.
+        { type: 'ladder', x: 88,  y: 880,  height: 280 },
+        { type: 'ladder', x: 274, y: 2200, height: 300, side: 'right' },
+
+        // Both ropes run ALONG a wall, strung between two brackets on the same face. There was a third
+        // arrangement — one spanning the full gap, which is the iconic look — and it is gone on purpose.
+        // A taut-ish line across the shaft is the one silhouette in this level that can be mistaken for
+        // something to land on, and no amount of sag or hung cloth fixes that reliably: the middle 90px
+        // of the span had no ledge under it at all, so reaching for it was simply a fall. An along-wall
+        // rope carries the same "someone lives here" cue with none of that ambiguity, which is the whole
+        // reason to prefer it.
+        { type: 'laundry', x: 8,   y: 2380, width: 96 },
+        { type: 'laundry', x: 284, y: 3300, width: 106 },
+
+        // A window over each rope, because washing does not appear on a blank wall — somebody leaned out
+        // of something to hang it. These use the `scullery` variant: the same 50x64 opening and the same
+        // stone lintel and sill as every other window, six small panes instead of four large ones, and
+        // the sash pushed up so the bottom of it is open. That open sash is what ties the two together.
+        // Sat 2px above each rope, so each window's stone sill just laps the rope's top and the rope
+        // reads as tied under it. Neither needed the rope moved down — both landed in clear stretches of
+        // wall with no ledge, gargoyle sprite or existing window in the way.
+        // `x` matches the rest of its wall's bay rather than centring on the rope — alignment down the
+        // facade matters more than being centred on one piece of string, and washing hung out of a window
+        // does not politely centre itself anyway. The left rope runs 8-104 under a window at 14-76, so it
+        // trails off to the right of the opening, which is what a real line does.
+        { type: 'window', x: 20,  y: 2420, variant: 'scullery' },
+        { type: 'window', x: 312, y: 3340, variant: 'scullery' }
     ],
 
     // The wildlife arrives with the hazard pass: a pigeon perched on a ledge turning its head
