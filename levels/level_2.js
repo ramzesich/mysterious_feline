@@ -47,15 +47,23 @@ const LEVEL_2 = {
     // world ends much above his head the clamp wins instead and pins him against the top of the
     // frame with nothing visible above — which reads as broken rather than as high up.
     worldHeight: 4450,
-    spawnX: 40,
+    // He starts OFF SCREEN to the left and walks on. Negative x is permanently invisible in this
+    // level — worldWidth equals the frame width, so cameraForX clamps to 0 and never pans, and
+    // #gameWindow clips the rest — which is what makes the entrance possible without a wider world.
+    // Only the left-walk branch clamps catX to 0, so walking rightward out of negative x needs no
+    // special case.
+    spawnX: -70,
     spawnY: 4110,      // Standing on the roof below, which tops out at 4095 + 15
-    // How he arrives, in place of level 1's climb out of a vent pipe. 'drop' walks him off the roof
-    // and down onto the first balcony on its own, with player input locked until he lands — that
-    // opening jump IS this level's arrival animation, and gameplay starts when it finishes.
+    // How he arrives, in place of level 1's climb out of a vent pipe. 'walk-in' walks him on from off
+    // screen with player input locked and stops him once he is fully in frame — still up on the roof,
+    // with the whole descent ahead of him and the first step down left to the player. It replaced a
+    // 'drop' arrival that walked him off the roof and onto the first balcony automatically, which
+    // spent the level's opening move before anyone had touched a key.
     // A checkpoint always overrides this with 'emerge', because a checkpoint is by definition a
     // thing he squeezes out of.
-    arrival: 'drop',
-    arrivalDir: 'right', // Which way off the roof the first balcony lies
+    arrival: 'walk-in',
+    arrivalDir: 'right',  // Coming from the left, so he walks rightward
+    arrivalStopX: 30,     // Clear of the frame edge and near the middle of a 110px roof
     lethalFloor: true, // The street at y=0 kills; there is no safe ground in this level
     pits: [],          // No alleys: the whole level is the gap between two buildings
 
@@ -63,27 +71,46 @@ const LEVEL_2 = {
     // the level is a drop *into* it rather than onto another balcony. Miss and the street has him.
     goal: { x: 0, y: 100, width: 110, height: 100 },
 
-    // The two buildings, and they are deliberately NOT the same height OR the same width — which is
-    // most of what makes the opening read as a rooftop. The LEFT one is narrower and ENDS at the roof
-    // deck he starts on, so there is open sky above his head; the RIGHT one is wider and carries on
-    // past the top of the frame. They live in #world and scroll, because a wall painted on the frame
-    // can never end anywhere, and a roof with three more storeys stacked on top of it is not a roof.
+    // The two buildings. They are different WIDTHS (110 and 130) but their roofs are at the same
+    // height, so the opening reads as one street seen from between two facing rooftops. Both walls
+    // end at 4110 with open sky above them — that patch of sky is the only thing that makes the start
+    // read as "off a rooftop" rather than "off another ledge". They live in #world and scroll, because
+    // a wall painted on the frame can never end anywhere, and a roof with three more storeys stacked
+    // on top of it is not a roof.
+    //
+    // Two dead ends, kept here because both are easy to re-invent. The right wall first ran past the
+    // top of the frame (top: 4450) with a decorative second roofline painted across it at the left
+    // roof's height — a rooftop with 340px of masonry standing on it is a ledge, whatever it is drawn
+    // like. Then it ended at 4270, which is *worse than it sounds*: `camera = catY - 289`, so the
+    // arrival drop onto the first balcony puts the frame top at 4291, and a top 21px above the visible
+    // edge — against a sky within a few points of the masonry's own value — is indistinguishable from
+    // a wall that never ends at all.
     walls: [
-        { side: 'left', width: 110, top: 4110 },  // Flush with the roof deck's surface
-        // The full height of the world, so its own parapet sits above the frame and is never seen
-        // — but `roofEdge` plants a second, purely decorative cap at the same height as the left
-        // roof, so the opening reads as two facing rooftops rather than one roof and one wall that
-        // just keeps going up.
-        { side: 'right', width: 130, top: 4450, roofEdge: 4110 }
+        { side: 'left', width: 110, top: 4110 },
+        { side: 'right', width: 130, top: 4110 }
     ],
 
     objects: [
-        // === The roof he arrives on, straight off the end of level 1. Only as wide as its own
-        // building (110) — smaller than any balcony below it, and flush rather than cantilevered,
+        // === The roof he arrives on, straight off the end of level 1. Its right edge is flush with
+        // its building at 110 — smaller than any balcony below it, and flush rather than cantilevered,
         // because it is the top of the building rather than something bolted to its face. The
         // balconies further down are wider than this and overhang their wall, which is the contrast
-        // that makes them read as balconies. The arrival walks him off it automatically.
-        { type: 'platform', x: 0, width: 110, height: 4095, side: 'left', variant: 'roof' },
+        // that makes them read as balconies.
+        // It starts at -90 so the walk-in arrival has deck under his feet while he is still off
+        // screen. Everything left of 0 is permanently outside the frame in this level, so the roof
+        // still *reads* as the 110px one flush with the wall; only the gravel's phase changes.
+        { type: 'platform', x: -90, width: 200, height: 4095, side: 'left', variant: 'roof' },
+        // Its twin across the street, at the same height and on the same drawing — `.ledge-roof` has
+        // no side-specific pseudo-elements, so "mirrored" costs nothing but the `side`. It is a real
+        // platform rather than scenery on purpose: it is pixel-for-pixel the deck he is standing on,
+        // so it has to behave like one. A decorative twin he dropped through would be the one thing
+        // this level's art rules forbid outright — nothing may look like footing unless it is.
+        // It never gets in the way of the first step down: walking off the left roof, he has fallen
+        // ~128px by the time his box reaches x=235, so he passes this slab's height long before its
+        // edge and carries on to the balcony below. He *can* jump across to it (160px gap against
+        // ~262px of jump travel), which strands him nowhere — dropping off its left lip lands on that
+        // same balcony.
+        { type: 'platform', x: 270, width: 130, height: 4095, side: 'right', variant: 'roof' },
 
         // === Upper storeys: gentle, to teach that walking off the lip is the whole verb. Drops
         // 150 / 205 / 135.
@@ -121,11 +148,17 @@ const LEVEL_2 = {
         // === Lower storeys, mixed rhythm. Drops 200 / 130 / 245 / 160 / 215 / 140.
         { type: 'platform', x: 0, width: 160, height: 1900, side: 'left', variant: 'balcony' },
         { type: 'platform', x: 250, width: 150, height: 1770, side: 'right', variant: 'sill' },
-        // The sweeper: mounted on the left wall he's already committed to by the time he's this
-        // close (the 245px drop off the sill is the longest horizontal traverse in the level), so
-        // she notices him mid-fall and is telegraphing before he lands rather than after. y sits
-        // 75px above the gargoyle ledge below so the telegraph has room to play out in the air.
-        { type: 'sweeper', x: 0, y: 1600, side: 'left' },
+        // The sweeper, mounted on the left wall he's already committed to by the time he's this
+        // close (the 245px drop off the sill is the longest horizontal traverse in the level).
+        // TWO placement rules, and she is inert if either is broken — she was, both ways, at first:
+        //   * x is the wall's INNER face (wall width 110 - her own 50), not 0. At 0 she sits at the
+        //     outer edge of her own building with 60px of masonry between her and the gap, and the
+        //     broom sweeps nothing but brick.
+        //   * y sits just above the ledge below (slab tops out at 1540), because the lethal band is
+        //     her window's own span. Mounted 75px up "so the telegraph has room to play out in the
+        //     air", her band started 15px above his ears — she could not have hit him at any x, on
+        //     any frame. The telegraph gets its air time from the detect zone instead.
+        { type: 'sweeper', x: 60, y: 1550, side: 'left' },
         { type: 'platform', x: 0, width: 130, height: 1525, side: 'left', variant: 'gargoyle' },
         { type: 'platform', x: 220, width: 180, height: 1365, side: 'right', variant: 'awning' },
         { type: 'platform', x: 0, width: 110, height: 1150, side: 'left', variant: 'gargoyle' },

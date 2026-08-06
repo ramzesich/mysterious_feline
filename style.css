@@ -90,31 +90,11 @@ body {
     border-top: 1px solid rgba(255, 159, 28, 0.5);
     box-sizing: border-box;
 }
-/* A second, lower roofline (buildWalls(), `w.roofEdge`) for a wall whose own parapet sits above the
-   frame and is never seen. Level 2 uses it so the taller right building still shows a roof edge
-   level with the left one, at the height Bumbot actually starts from.
-   Deliberately the SAME gravel/felt recipe as .ledge-roof, not the thin amber-lined parapet cap
-   above (.facade-wall::before) — the first cut borrowed that one, and a thin lip with a danger
-   line reads as a wall's cap, not as a rooftop. This has to look like the deck Bumbot is
-   standing on across the gap, even though — unlike .ledge-roof — it is purely decorative and
-   carries no collision of its own. */
-.facade-roof-edge {
-    position: absolute;
-    height: 15px;
-    z-index: 1; /* Level with the wall's own coping, still behind the ledges */
-    pointer-events: none;
-    box-sizing: border-box;
-    background:
-        radial-gradient(circle 1.5px at 18px 5px, rgba(255, 255, 255, 0.14), transparent),
-        radial-gradient(circle 1.3px at 51px 8px, rgba(0, 0, 0, 0.32), transparent),
-        radial-gradient(circle 1.6px at 88px 4px, rgba(255, 255, 255, 0.10), transparent),
-        repeating-linear-gradient(90deg, rgba(0, 0, 0, 0.24) 0 2px, transparent 2px 96px),
-        linear-gradient(#4a4741 0 5px, #2f2d29 5px 9px, #1b1a18 9px 100%);
-    background-size: 160px 100%, 160px 100%, 160px 100%, 96px 100%, 100% 100%;
-    background-repeat: repeat-x;
-    border: 1px solid #26221d;
-    border-top: 3px solid #5b574f;
-}
+/* Both walls in level 2 end at the same height, each capped by its own parapet (::before, above) and
+   each carrying a `roof` ledge as its deck — so a wall's top needs no special drawing of its own.
+   Two dead ends worth not re-inventing: a decorative second roofline painted across a wall that
+   carries on past it (a cap with storeys above it reads as a ledge), and chimney stacks above the
+   coping (only ever needed for a roof you are looking UP at, which no longer exists here). */
 #ui {
     position: absolute;
     top: 15px;
@@ -1644,15 +1624,24 @@ button.secondary:hover { background: #1b1e2c; color: #aab3c4; }
 
 /* --- The broom-sweeper: an old woman who looks like a shuttered window until Bumbot gets close,
    then leans out and swats him off the wall. Same stone surround as the sash-window checkpoint —
-   she's furniture in the same wall, not a separate thing bolted on — but z-index has to put her
-   IN FRONT of Bumbot rather than behind, because unlike a pipe or a portal she actually reaches
-   for him. State classes (.active, .swinging) are driven by updateSweepers() in game.js. */
+   she's furniture in the same wall, not a separate thing bolted on.
+
+   ALL of her sits behind Bumbot, on the same layer as every other window in this wall, and the reason
+   is structural rather than aesthetic: .sweeper-mask clips her to the window opening, so the figure is
+   *inside* the wall by construction and can never be in front of it. Two earlier attempts got this
+   wrong from the same false premise — that "she reaches into his space", which is true of her hitbox
+   but not of her drawing. z-index 12 on the whole element put her window over him; splitting the
+   window behind and the figure in front left him sandwiched between the two halves of one object.
+   State classes (.active, .swinging) are driven by updateSweepers() in game.js. */
 .sweeper {
     position: absolute;
     width: 50px;
     height: 64px;
-    z-index: 12; /* level with the birds — she reaches into his space, they don't stay behind it */
+    z-index: 5; /* with .sash-window and .goal-window: he stands in front of holes in this wall */
 }
+/* Mirrored for the other wall — on .sweeper rather than on .sweeper-rig, so that the mask's reach into
+   the gap (below) mirrors with it and the whole thing stays authored once, for a left-hand wall. */
+.sweeper-right { transform: scaleX(-1); }
 .sweeper-window {
     position: absolute;
     inset: 0;
@@ -1662,14 +1651,19 @@ button.secondary:hover { background: #1b1e2c; color: #aab3c4; }
     box-shadow: inset 0 0 10px rgba(0, 0, 0, 0.8);
     transition: background 0.3s ease-out;
 }
-/* Clips the figure at the window's own box. Deliberately a sibling of .sweeper-window rather than
-   overflow:hidden on .sweeper itself (or on the window) — either of those would also clip the
-   window's own lintel/sill (::before/::after), which are *meant* to overhang past this box into
-   the wall. Without this, "tucked below the sill" just rendered below the window fully visible —
-   translateY moves an element, it does not hide it, and .sweeper had nothing clipping its box. */
+/* Hides the figure while she is tucked away, and that is ALL it should do. Deliberately a sibling of
+   .sweeper-window rather than overflow:hidden on .sweeper itself (or on the window) — either of those
+   would also clip the window's own lintel/sill (::before/::after), which are *meant* to overhang past
+   this box into the wall. Without it, "tucked below the sill" just rendered below the window fully
+   visible: translateY moves an element, it does not hide it.
+   The clip it needs is VERTICAL only. At `inset: 0` it also trimmed the swing at the window's outer
+   edge, so the last 21px of broom — the part that crosses the ledge where Bumbot actually stands —
+   was invisible while still being lethal, the drawing quietly contradicting `sweeperReach`. It now
+   runs 80px out into the gap (against a reach of 75) and clips only above the lintel and below the
+   sill, which is the only direction the tuck needs. */
 .sweeper-mask {
     position: absolute;
-    inset: 0;
+    left: 0; right: -80px; top: 0; bottom: 0;
     overflow: hidden;
     pointer-events: none;
 }
@@ -1696,7 +1690,10 @@ button.secondary:hover { background: #1b1e2c; color: #aab3c4; }
    below the sill until triggered, then rises into the opening. */
 .sweeper-rig {
     position: absolute;
-    left: 50%;
+    /* 25px = the centre of the 50px WINDOW, not of the mask. This was `left: 50%`, which was the same
+       thing until the mask grew out into the gap — at which point 50% silently moved her 40px sideways,
+       out of her own window. Anything positioned in here has to key off the window, not the mask. */
+    left: 25px;
     bottom: 2px;
     width: 34px;
     height: 52px;
@@ -1708,11 +1705,10 @@ button.secondary:hover { background: #1b1e2c; color: #aab3c4; }
     transform: translateY(75px); /* out of sight below the sill */
     transition: transform 0.32s cubic-bezier(0.34, 1.3, 0.64, 1);
 }
-/* Authored for a left-wall sweeper (swings rightward, into the gap); a right-wall one is the same
-   rig mirrored, exactly like a pigeon's facing — one drawing, not two. */
-.sweeper-right .sweeper-rig { transform: translateY(75px) scaleX(-1); }
+/* Authored for a left-wall sweeper, swinging rightward into the gap. The mirror for a right-hand wall
+   lives on .sweeper (above) rather than here, so it also flips the mask's reach — one drawing, not two,
+   exactly like a pigeon's facing. */
 .sweeper.active .sweeper-rig { transform: translateY(4px); }
-.sweeper.active.sweeper-right .sweeper-rig { transform: translateY(4px) scaleX(-1); }
 
 .sweeper-body {
     position: absolute;
@@ -1735,7 +1731,12 @@ button.secondary:hover { background: #1b1e2c; color: #aab3c4; }
     background: #241f1c;
     border-radius: 2px;
     transform-origin: 50% 8%; /* the shoulder */
-    transform: rotate(95deg); /* held in close, out of the way, while she's still just leaning out */
+    /* Held down at her side, inside the window, while she is still just leaning out. This was
+       rotate(95deg), which is nearly a quarter turn the WRONG way: the arm hangs down from the
+       shoulder at 0deg, so 95deg laid the broom out horizontally to the left — straight back
+       through her own wall, bristles poking out of the masonry. The swing below is the only pose
+       that should cross into the gap. */
+    transform: rotate(15deg);
     transition: transform 0.2s ease-in;
 }
 /* The swing itself: fast out, matching sweeperSwingFrames in game.js so the lethal window and the

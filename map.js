@@ -32,13 +32,17 @@
 //   axis          — 'horizontal' or 'vertical'. Decides which way the camera scrolls and how
 //                   the level is won. See below.
 //   worldWidth    — the world's width in px.
-//   spawnX        — where Bumbot starts, and where he respawns until a checkpoint is passed.
+//   spawnX        — where Bumbot starts, and where he respawns until a checkpoint is passed. May be
+//                   NEGATIVE for a 'walk-in' arrival, which starts him off the left-hand edge; only
+//                   the left-walk branch clamps catX to 0, so walking rightward out of it is fine.
+//                   Whatever he walks in over still needs floor under it that far out.
 //   pits          — [{ x, width }] lethal gaps in the floor. May be empty.
 //   arrival       — how Bumbot shows up at the level's own spawn: 'emerge' (climbs out of the
-//                   pipe/window there, the default), 'drop' (walks off and falls onto the first
-//                   ledge with input locked — level 2's opening), or 'stand' (already there).
-//                   A checkpoint always overrides this with 'emerge'. 'drop' also reads
-//                   `arrivalDir` ('left' | 'right') for which way to step off.
+//                   pipe/window there, the default), 'walk-in' (walks on from off screen with input
+//                   locked and stops at `arrivalStopX` — level 2's opening), 'drop' (walks off and
+//                   falls onto the first ledge with input locked), or 'stand' (already there).
+//                   A checkpoint always overrides this with 'emerge'. 'drop' and 'walk-in' both read
+//                   `arrivalDir` ('left' | 'right'): which way he steps off, or which way he walks in.
 //   objects       — the level. See "Entity model" in CLAUDE.md for the types.
 //   birds         — the wildlife. `axis` picks species and behaviour together.
 //

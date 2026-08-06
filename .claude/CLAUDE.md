@@ -32,9 +32,11 @@ Verify changes by actually playing. Level 1: press Start, climb out of the spawn
 jump onto a catwalk, touch razor wire (fur up, bail off screen, respawn out of a pipe), fall into an
 alley, ride a gondola, walk into a strutting pigeon, get hit by a crow, pass the checkpoint pipe
 then die (should respawn there), press `M` (ripple + installations shatter), reach the feeder and
-watch the munch sequence. Level 2: check the frame actually resizes to portrait, drop from ledge to
-ledge down both walls, fall down the middle slot to the street (should die), pass the checkpoint
-window then die (should respawn there), and reach the goal window (should shrink into it).
+watch the munch sequence. Level 2: check the frame actually resizes to portrait, watch him walk in from
+off screen and stop on the roof with both rooftops and the sky above them in shot, drop from ledge to
+ledge down both walls, get swatted by the old woman with the broom, fall down the middle slot to the
+street (should die), pass the checkpoint window then die (should respawn there — walking in again if you
+died before it), and reach the goal window (should shrink into it).
 
 ## Files
 
@@ -278,6 +280,33 @@ record (`{...obj, dom, active}`); `level.birds` become `BirdEntities`.
   deletes a pillar; it just forces her to `cooldown` early (a flinch, not a kill) — see Catnip
   below for why every new hazard has to opt into that check by hand.
 
+  **Placing one is where she goes wrong**, and both failures are silent — she runs her whole
+  animation and simply never connects. Her lethal rectangle is her window's own box grown out by
+  `sweeperReach`, so: mount her `x` at the wall's **inner** face (`wallWidth - sweeperWidth`, not 0,
+  or she is set into the far side of her own building and sweeps 60px of brick), and mount her `y`
+  just above the ledge she guards, because the band is her window's vertical span — a window mounted
+  a comfortable 75px up cannot reach a 45px cat standing below it, at any x, on any frame. `reach`
+  must span that ledge edge to edge too; stopping short leaves a safe pocket at the outer lip, which
+  is exactly where he stands to drop. The telegraph gets its air time from `sweeperDetectVPad`, and
+  that pad wants to stay *small* — pad it generously and she burns the whole telegraph while he is
+  still falling, so the broom turns lethal on the frame he lands, which is unavoidable rather than
+  hard.
+
+  Mounting her where she can reach also means she **overlaps Bumbot**, and all of her belongs *behind*
+  him, at z-index 5 with the other windows in this wall. That is structural, not aesthetic:
+  `.sweeper-mask` clips her to the window opening, so the figure is inside the wall by construction and
+  can never be in front of it. Two attempts went wrong from the same false premise — that "she reaches
+  into his space", which is true of her hitbox and not of her drawing. z-index 12 on the whole element
+  put her window over him; splitting the window behind and the figure in front left him sandwiched
+  between two halves of one object.
+
+  That mask is also the thing that has to grow when `sweeperReach` does. It clipped at the window's own
+  box, so the outer 21px of the swing — the part crossing the ledge he stands on — was invisible while
+  still killing him. Its clip needs to be **vertical only** (above the lintel, below the sill, which is
+  all the tuck needs); it now runs 80px out into the gap. Two knock-ons: the right-hand mirror moved from
+  `.sweeper-rig` up to `.sweeper` so the reach mirrors with it, and `.sweeper-rig`'s `left` had to stop
+  being `50%`, which silently meant 50% *of the mask* and shifted her out of her own window.
+
 The goal is not a level object in either level, but it is a different thing in each. A horizontal
 level's is the cat feeder (`#goalFeeder`), a **static** child of `#world` positioned by
 `applyLevelGeometry()`; it shares the `.feeder` class with nothing else, which is why level clearing
@@ -459,20 +488,32 @@ arrives is per-level data, not a constant:
 | `level.arrival` | What happens | Used by |
 |---|---|---|
 | `'emerge'` (default) | `playPipeEmerge()` — climbs out of the pipe/window at the spawn | level 1 |
-| `'drop'` | Walks off the roof and falls onto the first ledge, **input locked**, then hands over | level 2 |
+| `'walk-in'` | Walks on from off screen, **input locked**, stops at `arrivalStopX` | level 2 |
+| `'drop'` | Walks off the roof and falls onto the first ledge, **input locked**, then hands over | — |
 | `'stand'` | Nothing. He is already there. | — |
 
 A **checkpoint always overrides this with `'emerge'`**, whatever the level says, because a checkpoint
 is by definition a thing he squeezes out of. `respawnArrival` tracks which one the *current* respawn
-point uses, so dying before level 2's checkpoint replays the roof drop and dying after it climbs out
+point uses, so dying before level 2's checkpoint replays the walk-in and dying after it climbs out
 of the window.
 
-The roof drop (`'drop'`) is **not a CSS animation** — it is the real physics engine with the player's
-hands tied, so he lands wherever collision actually puts him rather than wherever a keyframe guessed.
-`introHold` locks input (checked in `keydown`, and `advanceIntro()` overwrites the key state each
-frame so a key already held cannot steer it), and it clears the moment he is grounded below where he
-started. Measured at ~0.70s for level 2. `advanceIntro()` runs at the top of `stepPhysics` *before*
-input is read, and tests for the landing before re-forcing the key, or he takes one extra step past it.
+Neither scripted arrival is a CSS animation — both are the real physics engine with the player's hands
+tied, so he ends up wherever collision actually puts him rather than wherever a keyframe guessed.
+`introHold` locks input (checked in `keydown`, and `advanceIntro()` overwrites the key state each frame
+so a key already held cannot steer it). `advanceIntro()` runs at the top of `stepPhysics` *before* input
+is read, and tests its end condition before re-forcing the key, or he takes one extra step past it. The
+two shapes end differently, which is why `introMode` exists: `'drop'` ends once he is grounded below
+where he started; `'walk-in'` never leaves the ground at all, so it ends on reaching `introStopX`.
+
+Level 2's walk-in starts at `spawnX: -70` — **off the left-hand edge of the world**. That works because
+`worldWidth` equals the frame width there, so `cameraForX` clamps to 0 and never pans, and everything
+left of 0 is permanently clipped by `#gameWindow`; and because only the left-walk branch clamps `catX`
+to 0, so walking rightward out of negative x needs no special case. The catch is *floor*: the roof
+platform is widened to `x: -90, width: 200` so there is deck under him while he is still off screen. Its
+right edge stays at 110, so the roof still reads as the flush 110px one.
+
+It replaced a `'drop'` arrival that walked him off the roof onto the first balcony automatically, which
+spent the level's opening move before the player had touched a key. `'drop'` is still supported.
 
 `playPipeEmerge()` goes through `playBodyAnimation()`, so `cat-emerge` has to stay in that function's
 removal list or a second emerge won't replay.
@@ -518,8 +559,21 @@ reasoning that the masonry is identical all the way down so there is nothing to 
 wrong for one specific reason: **a wall painted on the frame can never end anywhere.** Level 2's left
 building has to stop at the roof deck Bumbot starts on — the patch of open sky above his head (291px
 of the 620px frame at spawn) is the only thing that makes the opening read as "off a rooftop" rather
-than "off another ledge". The right building deliberately runs past the top of the frame instead, so
-the two buildings are visibly different heights.
+than "off another ledge". **Both** walls end at 4110 with sky above them, and each carries a `roof`
+ledge as its deck, so the opening is two facing rooftops at the same height — different *widths* (110
+and 130) rather than different heights. The right one's deck is a real `platform`, not scenery: it is
+the same drawing as the one he is standing on, and this level's art rules forbid anything that looks
+like footing without being it.
+
+Two dead ends there, both easy to re-invent:
+
+- **A decorative second roofline** painted across a wall that carries on past it (the right wall used
+  to run to 4450 with a cap drawn at 4110). A rooftop with 340px of masonry standing on it reads as a
+  ledge whatever it is drawn like. Move a wall's `top` instead.
+- **Ending below `worldHeight` is not the same as ending on screen.** `camera = catY - 289`, so standing
+  on level 2's first balcony (catY 3960) puts the frame top at 4291; a wall topping out at 4270 ends 21px
+  above the visible edge, against a sky within a few points of the masonry's own value, and looks
+  exactly like a wall that never ends. Whatever a wall's top is, it needs room above it.
 
 Consequences: the walls scroll, so their staining drifts past as he descends; each carries a parapet
 coping at its own top (`.facade-wall::before`); and the roof deck is flush with its wall (130 wide,

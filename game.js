@@ -82,9 +82,18 @@ const maxSliceTravel = 10;
 // Timers are in 60fps frames like everything else, so they scale with dt the same way.
 const sweeperWidth = 50;
 const sweeperHeight = 64;
-const sweeperReach = 55;      // How far the broom's lethal hitbox extends out from her own wall
+// How far the broom's lethal hitbox extends out from her own x. This has to cover the LEDGE she
+// overlooks, edge to edge — she is sweeping him off it, and a reach that stops short just leaves a
+// safe pocket at the outer lip, which is exactly where he stands to drop anyway. 75 covers level 2's
+// 130px gargoyle ledge from a window mounted flush with the wall's inner face, and matches where the
+// drawn bristles actually land at full swing (see .sweeper-arm in style.css).
+const sweeperReach = 75;
 const sweeperDetectOut = 140; // How far into the gap the "notice him" zone reaches
-const sweeperDetectVPad = 40; // Vertical padding added above and below her window for detection
+// Vertical padding above and below her window for detection, and deliberately SMALL. A generous pad
+// meant she noticed him early in the fall onto her ledge and spent the whole telegraph while he was
+// still in the air — so the broom went lethal at the exact moment he touched down, with no frame in
+// between to react. Keep this tight enough that the telegraph starts as he arrives, not before.
+const sweeperDetectVPad = 10;
 const sweeperTelegraphFrames = 26; // ~0.43s: she leans into the opening, not yet lethal
 const sweeperSwingFrames = 16;     // ~0.27s: the broom is out and lethal
 const sweeperCooldownFrames = 60;  // ~1s retreated with the window shut before she can re-arm
@@ -462,21 +471,6 @@ function buildWalls() {
         if (w.side === 'left') el.style.left = '0px';
         else el.style.right = '0px';
         world.appendChild(el);
-
-        // An optional second roofline, below the wall's own top. The right building in level 2
-        // genuinely is taller — its own parapet (`::before`, at `w.top`) still sits above the frame
-        // and is never seen — but it also wants to read as an ordinary rooftop at the height Bumbot
-        // actually starts from, so the opening shows two facing roofs instead of one roof and one
-        // wall that just keeps going.
-        if (w.roofEdge != null) {
-            const edge = document.createElement('div');
-            edge.classList.add('facade-roof-edge', 'level-entity');
-            edge.style.width = w.width + 'px';
-            edge.style.bottom = (40 + w.roofEdge) + 'px';
-            if (w.side === 'left') edge.style.left = '0px';
-            else edge.style.right = '0px';
-            world.appendChild(edge);
-        }
     });
 }
 
@@ -1191,18 +1185,27 @@ const idleThreshold = 180; // ~3 seconds of standing still before he settles
 // checkpoint replays the roof drop and dying after it climbs out of the window.
 let respawnArrival = 'emerge';
 
-// The scripted roof drop. Not a CSS animation: it is the real physics engine with the player's hands
-// tied, so he lands wherever collision actually puts him rather than wherever a keyframe guessed.
-// introHold locks input; the drop ends the moment he is grounded below where he started.
+// The scripted arrivals. Not CSS animations: they are the real physics engine with the player's hands
+// tied, so he ends up wherever collision actually puts him rather than wherever a keyframe guessed.
+// introHold locks input. Two shapes, and they end on different conditions:
+//   'drop'    — steps off and falls; ends the moment he is grounded below where he started.
+//   'walk-in' — walks on from off screen; ends when he reaches `introStopX`. He never leaves the
+//               ground, so the 'drop' end condition would never fire for it.
 let introHold = false;
+let introMode = 'drop';
 let introDir = 'right';
 let introFromY = 0;
+let introStopX = 0;
 
 function playArrival() {
-    if (respawnArrival === 'drop') {
+    if (respawnArrival === 'drop' || respawnArrival === 'walk-in') {
         introHold = true;
+        introMode = respawnArrival;
         introDir = level.arrivalDir || 'right';
         introFromY = catY;
+        // Where a walk-in comes to rest. Default 0 = as soon as his box is fully inside the frame,
+        // since he starts at a negative x, off the left-hand edge of the world.
+        introStopX = level.arrivalStopX || 0;
         keys.ArrowLeft = false; keys.ArrowRight = false;
         keys.ArrowUp = false; keys.Space = false;
         return;
@@ -1212,10 +1215,13 @@ function playArrival() {
 }
 
 // Drives the scripted arrival. Called at the top of stepPhysics, before player input is read, and
-// checks for the landing *before* re-forcing the key so he does not take one extra step past it.
+// checks for the end condition *before* re-forcing the key so he does not take one extra step past it.
 function advanceIntro() {
     if (!introHold) return;
-    if (isGrounded && catY < introFromY - 1) {
+    const done = introMode === 'walk-in'
+        ? (introDir === 'right' ? catX >= introStopX : catX <= introStopX)
+        : (isGrounded && catY < introFromY - 1);
+    if (done) {
         introHold = false;
         keys.ArrowLeft = false;
         keys.ArrowRight = false;
