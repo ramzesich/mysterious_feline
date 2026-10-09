@@ -1,52 +1,180 @@
 # Bumbot — browser platformer
 
-A zone-based side-scrolling platformer. Play as Bumbot — a live black Bombay cat, **not** a
-robot, despite what the old `triggerShortCircuitReset`/battery naming used to imply — running
-across the **rooftops** of a cyberpunk city to the cat feeder waiting at the far end, dodging
-razor wire, the alleys between buildings, and birds both airborne and on foot; collecting
-snacks, and using the Sonic Meow to clear obstacles. Zone 1 (`neon-outskirts`) is 16000px of
-thirteen rooftops, with a checkpoint vent pipe at its midpoint. Keep copy, comments and new
-mechanics feline rather than mechanical, and keep new scenery *rooftop* — if a thing wouldn't
-plausibly be bolted to the top of a building, it doesn't belong up here.
+A level-based platformer. Play as Bumbot — a live black Bombay cat, **not** a robot, despite what
+the old `triggerShortCircuitReset`/battery naming used to imply — making his way across a cyberpunk
+city, dodging razor wire, birds both airborne and on foot, and the drop; collecting snacks, and
+using the Sonic Meow to clear obstacles. Keep copy, comments and new mechanics feline rather than
+mechanical, and keep new scenery plausible for wherever the level is set.
+
+Two levels, and they do not share a shape:
+
+- **Level 1, `neon-outskirts`** — a 700×350 letterbox you run right across: 16000px of thirteen
+  rooftops with a checkpoint vent pipe at the midpoint. New scenery here must be *rooftop* — if a
+  thing wouldn't plausibly be bolted to the top of a building, it doesn't belong up there.
+- **Level 2, `the-long-way-down`** — a 400×620 portrait you fall down: 4200px of masonry between
+  two buildings, zig-zagging balcony to gargoyle to bare ledge, from the roof to a lit second-floor
+  window with a sill to land on. The shaft has no floor: miss the sill and he falls out of sight.
+  Scenery here is old stonework seen from *outside* a building.
 
 ## Running it
 
 No build, no dependencies, no tests, no lint. Open `index.html` in a browser
-(`open index.html` — `file://` works fine). Scripts are plain globals loaded in order:
-`map.js` defines `ZONES`, then `game.js` consumes it. There is no module system —
-don't add `import`/`export` without also changing the script tags.
+(`open index.html` — `file://` works fine). Scripts are plain globals loaded **in order**: every
+`levels/level_N.js` declares one const, then `map.js` collects them into `LEVELS`, then `game.js`
+consumes it. There is no module system — don't add `import`/`export` without also changing the
+script tags.
 
-Verify changes by actually playing: climb out of the spawn pipe, move right, jump onto a
-catwalk, touch razor wire (fur up, bail off screen, respawn out of a pipe), fall into an alley, ride a
-gondola, walk into a strutting pigeon, get hit by a crow, pass the checkpoint pipe then die (should respawn there),
-press `M` (ripple + installations shatter), reach the feeder and watch the munch sequence before
-the win screen.
+`index.html?level=2` boots straight into that level, skipping the title card; add `#fast` to arm
+the catnip rush with it. 1-based, and an out-of-range value falls back to the menu rather than
+being clamped. macOS `open` **drops the query string** from a `file://` URL, so `open
+"…/index.html?level=2"` silently boots level 1; hand the URL to the browser directly instead
+(`osascript -e 'tell application "Google Chrome" to open location "file:///…/index.html?level=2"'`).
+
+Verify changes by actually playing. Level 1: press Start, climb out of the spawn pipe, move right,
+jump onto a catwalk, touch razor wire (fur up, bail off screen, respawn out of a pipe), fall into an
+alley, ride a gondola, walk into a strutting pigeon, get hit by a crow, pass the checkpoint pipe
+then die (should respawn there), press `M` (ripple + installations shatter), reach the feeder and
+watch the munch sequence. Level 2: check the frame actually resizes to portrait, watch him walk in from
+off screen and stop on the roof with both rooftops and the sky above them in shot, drop from ledge to
+ledge down both walls, get swatted by the old woman with the broom, pass the checkpoint window then die
+(should respawn there — walking in again if you died before it), check the camera stops scrolling once
+he is on the last balcony with the goal window and its sill in shot, drop off it straight down the
+middle (should fall out of the bottom of the frame and die — there is no street), then land on the sill
+short of the opening (nothing happens until he walks into it) and step in (should shrink into it).
 
 ## Files
 
 | File | Role |
 |---|---|
-| `index.html` | DOM skeleton: parallax layers, UI, `#world`, Bumbot's SVG sprite, win screen. Static elements only. |
-| `map.js` | `ZONES` — all level data, plus a header comment stating the design budget. |
+| `index.html` | DOM skeleton: parallax layers, UI, `#world`, Bumbot's SVG sprite, bird templates, win screen, title card. Static elements only. |
+| `levels/level_N.js` | One level each. A single named const (`LEVEL_1`, `LEVEL_2`) plus that level's design budget in its header comment. |
+| `map.js` | The registry: the `LEVELS` array and the schema contract every level file satisfies. No level data of its own. |
 | `game.js` | Everything else: input, physics, collision, particles, camera, audio. |
-| `style.css` | All visuals, hitbox-relevant sizes, and keyframe animations. |
+| `style.css` | All visuals, hitbox-relevant sizes, and keyframe animations. Level 2's material language is a marked block at the end. |
 
-## Zones
+## Levels
 
-`map.js` exports `ZONES`, an array of self-contained zone objects: `id`, `name`,
-`worldWidth`, `spawnX`, `pits`, `objects`, `birds`. `game.js` holds `zoneIndex` / `zone`
-and everything derives from that, so **adding a zone to the array is all that's needed** for
-it to be playable — the win screen automatically offers "Enter Next Zone" when a next zone
-exists, via `handleWinButton()`.
+`map.js` holds `LEVELS`, an array of the consts declared by the files in `levels/`. `game.js` holds
+`levelIndex` / `level` and everything derives from that — the win screen automatically offers
+"Enter Next Level" when a next level exists, via `handleWinButton()`.
 
-End-of-zone geometry is derived, not hardcoded: `applyZoneGeometry()` sets `#world` width and
-positions `#goalFeeder` at `worldWidth - goalInset`, and the win line is
-`worldWidth - winInset`. Changing a zone's length is a one-number edit.
+**Adding a level is three edits**: write `levels/level_N.js`, add its `<script>` tag above `map.js`,
+and add its const to `LEVELS`. The consts are named rather than inline object literals so a missing
+script tag fails loudly with a `ReferenceError` naming the level, instead of leaving a hole in the
+array.
 
-`map.js`'s header comment records the design budget implied by the physics constants (max
-pit width, max platform/pillar height, the ~310px vertical ceiling). Read it before authoring
-level data — it's the difference between a fair level and an impossible one. Zone 1 is
-designed to be completable **without spending a single snack**; meows are optional help.
+Each level declares its own `frame` (the game window is resized per level) and `axis`. `map.js`'s
+header documents the full schema, including the extra fields a vertical level needs
+(`worldHeight`, `spawnY`, `goal`), plus `bottomless`, which either axis may use.
+
+Each level file's header records **its own** design budget, and the two do not generalise to each
+other — level 1's ~310px vertical ceiling and 200px max alley say nothing about level 2, whose
+budget is about fall distance against ledge spacing. Read the one above the level you're editing;
+it's the difference between a fair level and an impossible one. Level 1 is completable **without
+spending a single snack**; meows are optional help.
+
+For a horizontal level, end-of-level geometry is derived rather than hardcoded:
+`applyLevelGeometry()` positions `#goalFeeder` at `worldWidth - goalInset` and the win line is
+`worldWidth - winInset`, so changing a level's length is a one-number edit. A vertical level instead
+names an explicit `goal` rect, because "the far right-hand edge" means nothing running downward.
+
+## Themes (look) vs axis (mechanics)
+
+**Every level has its own theme, and artwork must never be derived from the axis.** The axis is a
+mechanic — camera direction, win condition, whether the floor kills. The theme is presentation. They
+happen to correlate in the two levels that exist, which makes it tempting to key CSS off
+`isVertical`; don't. The next vertical level will be set somewhere else and would silently inherit
+level 2's brickwork and sash windows.
+
+Each level declares `theme`, and `applyLevelGeometry()` puts three things on `#gameWindow`:
+
+| Hook | Means | Example |
+|---|---|---|
+| `theme-<name>` | how it looks | `theme-facade` draws the two wall faces and hides the skyline layers |
+| `narrow-frame` | how much room there is (frame width < 500) | shrinks the win-screen title |
+| (inline width/height) | the frame itself, from `level.frame` | 700×350 vs 400×620 |
+
+`narrow-frame` is separate on purpose: overlay type shrinking is about available space, not about the
+setting or the direction of travel.
+
+Shared *furniture* resolves its artwork through `THEME_ART` in `game.js`, which maps a theme to
+default drawings — currently just the checkpoint (`rooftops` → vent pipe, `facade` → sash window).
+An entity can always override with its own `variant`, exactly as a `pillar` does; that is how level
+2's rooftop vent pipe survives inside a masonry-fronted level. Resolution happens in JS
+(`portalArt()`, mirroring `rooftopVariant()`) so each element gets exactly one drawing class, rather
+than the stylesheet fighting itself with `:not()` chains.
+
+Both checkpoints glow **cyan** whatever the theme, because that is the checkpoint colour language;
+the goal is the warm one. Keep that split — it is the only warm light below level 2's roofline, which
+is what makes the way out readable from a long way up.
+
+
+Everything that branches on `level.axis` lives in **five** places, and it is worth keeping it that
+way. If a sixth appears, that's the signal to split the engine per axis rather than keep threading
+`isVertical` through it:
+
+| Where | Horizontal | Vertical |
+|---|---|---|
+| `applyLevelGeometry()` | `#world` at `top: 0`, `height: 100%` | `#world` taller than the frame and anchored by its **bottom**, so `bottom: 40 + y` still lands right; `#goalFeeder` hidden |
+| `applyCamera()` | `left` only | also `bottom`, via `cameraForY()` |
+| `hasReachedGoal()` | `catX >= winX` | **standing** while overlapping `level.goal` |
+| `hasPassedCheckpoint()` | crossed its `x` | descended to its `y` (one-way, which only a one-way level can assume) |
+| `checkpointRespawn()` | clear of the pipe mouth | on the ledge outside the window |
+
+`buildTerrain()` used to be a sixth (vertical meant "draw a lethal street"). It now keys off
+`level.bottomless` instead, which is how it got off this list.
+
+Two things are driven by a **data flag** rather than the axis, deliberately, so a horizontal level
+could use them too: `level.bottomless` (no floor at `y = 0` — nothing drawn, and falling past it kills
+even while dashing) and `level.goal`.
+
+`isVertical` is recomputed in `applyLevelGeometry()`, so it is always in sync with `level`. It governs
+*behaviour only* — see "Themes vs axis" above for why no stylesheet rule may key off it.
+
+## Level 2's architecture
+
+The facade is built from the same `platform` entity as level 1's catwalks — identical 15px collision
+slab — reskinned by `side` (which wall it grows from) and `variant` (what it is). `generateLevel()`
+adds `.ledge`, `.ledge-<side>` and `.ledge-<variant>`, declared *after* `.platform` so they win on
+equal specificity and replace both the blue safety edge and the truss/legs pseudo-elements.
+
+The two pseudo-elements are budgeted, and every variant respects the split:
+
+- **`::before` — everything above the slab.** Balcony railing, awning valance. This one needs `top: auto`,
+  which `.ledge::before` sets for every variant at once — see the note there. `.platform::before` sets
+  `top: 100%` for level 1's support legs, and a variant that adds `bottom: 100%` + a `height` without
+  clearing it leaves the position over-constrained, at which point CSS discards `bottom`. Every balcony
+  railing in level 2 was drawn *under* its slab for exactly this reason.
+- **`::after` — everything below it.** Stone corbels, awning struts.
+
+Only the 15px slab is solid, so **nothing drawn above or below it may look like footing or like a
+wall** — the same trap level 1's support legs had to avoid.
+
+The **one exception is a balcony railing's gap-facing end**, which really is solid: `generateLevel()`
+emits a `rail` collider there so Bumbot cannot stroll off a balcony without getting over the iron
+first. That is the only place in either level where painted detail above a slab collides, and it is
+deliberate — the railing is drawn to be climbed. Everything else above or below a slab is still paint.
+
+The one exception to the budget is the `gargoyle`, whose head is a cloned SVG template appended as a
+child (`.gargoyle-sprite`). Painted detail cannot carry a face at this size — it is the same reason
+Bumbot and the birds stopped being emoji — so that variant spends a real element and uses its `::after`
+only to suppress the default corbel. Reach for this only when a variant genuinely needs *geometry*; two
+gradient-stack pseudo-elements are still the right budget for stonework.
+
+| Variant | What it is |
+|---|---|
+| `balcony` | Wrought-iron railing over stone, 26px tall. The strongest "someone lives here" cue in the level, and the only variant with **collision of its own**: the gap-facing end is a solid `rail`, so leaving a balcony costs a jump. `railHeight` in `game.js` must match the CSS height or the barrier stops matching the iron you can see. |
+| `gargoyle` | A carved head on a short bracket, replacing the corbel — the one piece of the facade with a face. The **only variant whose art is a cloned sprite** (`#gargoyleSprite`) rather than a pseudo-element, because a face needs real geometry; `.ledge-gargoyle::after` exists purely to suppress the default corbel. Anchored at the ledge's **wall** end, with 110–190px of slab above it, so the spout never projects into open air — anchored at the outer end it would read as footing. Drawn in **profile with one eye and an open jaw** — see the sprite's own header comment, because both of those are load-bearing and both were wrong first time. |
+| `awning` | Stretched canvas, the only non-stone ledge. Striped slab, scalloped valance, iron struts. |
+
+Periodic pattern is *correct* for the railing balusters and the awning stripes — real railings and
+awnings are evenly spaced. That is the same distinction level 1 draws between a pillar's face (never
+periodic) and an AC unit's louvres (rightly periodic).
+
+The wall faces themselves carry **no window rows** on purpose: the `window` entities and the two portals
+draw the windows, because they know where they actually are. Adding rows to the wall put them behind
+ledges at random offsets. A ledge should not draw one either — the retired `sill` variant did, and a
+window attached to the thing you stand on cannot know what is around it.
 
 ## Coordinate system (the main thing to get right)
 
@@ -105,22 +233,26 @@ Rig notes:
 - The gait is a four-beat: diagonal pairs (front-near + back-far) share a cycle, the other pair
   runs the same animation with a `-0.17s` delay — half of 0.34s — so it starts mid-stride.
 - `game.js` toggles `cat-run` and `cat-air` on `#cat` from `isGrounded` and the arrow keys, in
-  `update()` next to the idle-settling block. Both are cleared in `loadZone()`,
-  `startVictoryMunch()` and `triggerHurtReset()`, because those three stop the loop — leave them
-  on and he chews or dies with his legs still striding.
-- `spawnAfterImage()` clones the live sprite and strips the clone's `id`s: they would duplicate
-  the original's, and a motion trail wants a frozen snapshot.
+  `update()` next to the idle-settling block. Both are cleared in `loadLevel()`,
+  `startVictoryMunch()`, `triggerHurtReset()` and `showStartMenu()`, because those four stop the
+  loop — leave them on and he chews or dies with his legs still striding.
+- `cloneCatSprite()` takes a frozen snapshot of the live sprite for the dash trail and the title
+  card. It strips the clone's `id`s (they would duplicate the original's, and a snapshot does not
+  want parts still animating) and **removes `#bbFur` first** — the raised-fur spikes are hidden by
+  an *id* selector, so a stripped clone would otherwise render permanently spooked.
 - Only the birds keep `brightness(0)` in their filter stacks. On Bumbot it would crush his
   per-part shading to one black shape; the dash ghosts keep it deliberately, because a trail
   should read flat.
-- `sprite-lab.html` is a scratch harness for authoring: it links the real `style.css` and shows a
-  sprite at 1×/2×/4× standing on a real ground segment and at an alley edge. `qlmanage -t -s 600
-  -o <dir> <file>.svg` rasterizes an SVG so it can be examined without a browser.
+- For authoring sprites: `qlmanage -t -s 600 -o <dir> <file>.svg` rasterizes an SVG so it can be
+  examined without a browser. There was also a `sprite-lab.html` scratch harness (real `style.css`,
+  a sprite at 1×/2×/4× standing on a real ground segment and at an alley edge). It was never
+  committed and has since been deleted on purpose — so it is **not** in the repo, and git can't
+  bring it back. Rebuild it if a sprite ever needs that kind of isolated look again.
 
 ## Entity model
 
-`generateLevel()` turns each `zone.objects` entry into a DOM div plus a `RuntimeEntities`
-record (`{...obj, dom, active}`); `zone.birds` become `BirdEntities`.
+`generateLevel()` turns each `level.objects` entry into a DOM div plus a `RuntimeEntities`
+record (`{...obj, dom, active}`); `level.birds` become `BirdEntities`.
 
 - `pillar` — solid box from y=0 to `height`. Rendered as a roof installation: an optional
   `variant` (`hatch` / `ac` / `fan` / `tank` / `stack`) becomes a second CSS class, and
@@ -131,6 +263,22 @@ record (`{...obj, dom, active}`); `zone.birds` become `BirdEntities`.
   `hidden: true` it renders invisible and is revealed permanently on first landing. Reads as a
   service catwalk: `::after` is the under-truss, `::before` the support legs, both masked to
   fade downward — only the 15px slab collides, so the legs must never look solid.
+  In a vertical level the same type is a **ledge**: `side: 'left'|'right'` says which wall it grows
+  out of and `variant` (`balcony` / `gargoyle` / `awning`, or omitted for a bare stone ledge) picks the
+  stonework. Those add
+  `.ledge`, `.ledge-<side>` and `.ledge-<variant>`, declared *after* `.platform` in the stylesheet
+  so they win on equal specificity and replace both the blue safety edge (level 1's "static
+  platform" cue, meaningless here) and the truss/legs pseudo-elements with stone corbels. Collision
+  is identical — it is the same 15px slab either way, *except* for a `balcony`, which also gets a
+  `rail`.
+- `rail` — the solid outer end of a balcony railing. **Not placed in level data**: `generateLevel()`
+  derives one from every `variant: 'balcony'` platform, at whichever end faces the gap (the right-hand
+  end on a left wall, the left-hand end on a right wall). It has **no DOM** — `.ledge-balcony::before`
+  already paints that end, so it is collision only, and nothing about it needs `.level-entity`. It is
+  the first entity to use `solidMinY`, which lifts a collision box off the ground: its `height` still
+  means "top surface" like a pillar's, which is what lets the landing branch stand him on top of it
+  with no special case. Being standable is intentional; it is 6px wide, so perching is rare and looks
+  odd but is legal.
 - `mover` — a platform that oscillates. `axis: 'x'` slides between `baseX` and
   `baseX + range`; `axis: 'y'` raises between `baseHeight` and `baseHeight + range`. The axis
   also picks the machinery class (`mover-x` = gondola on cables, `mover-y` = hoist on a mast).
@@ -139,17 +287,152 @@ record (`{...obj, dom, active}`); `zone.birds` become `BirdEntities`.
   rather than a `clip-path`, because the silhouette needs to be transparent *between* loops.
 - `snack` — a collectible cat treat stick, overlap-only, +1 meow charge. Drawn purely in CSS
   (`.snack` plus its two pseudo-elements), not a glyph.
-- `portal` — the mid-zone checkpoint, overlap-only. Passing it sets `respawnX` to
-  `obj.x + 14` (just clear of the pipe mouth) and adds `.active`, which lights the pipe from
-  inside.
+- `portal` — the mid-level checkpoint, overlap-only. `hasPassedCheckpoint()` decides when it counts
+  and `checkpointRespawn()` where it puts you (both axis-dependent — see the table above); it then
+  sets `respawnX`/`respawnY` and adds `.active`, which lights the pipe from inside. Optional `y`
+  mounts it partway up a wall, which is what a vertical level's checkpoint window needs. Optional
+  `side` (vertical levels only) says which wall it's set into, which `respawnFace` reads to face him
+  back into the gap on respawn — a checkpoint on the right wall has to send him back out facing
+  *left*, not level 1's blanket "face right."
 - `pipe` — the same `.vent-pipe` drawing as the portal, permanently `.active`, and pure
   scenery: absent from `isSolidType()`/`isSlabType()`, from the meow sweep and from
-  `handleOverlapSystems()`. One sits at the zone spawn so Bumbot's arrival matches his
+  `handleOverlapSystems()`. One sits at the level spawn so Bumbot's arrival matches his
   respawns.
+- `window` — pure scenery: a window in the masonry (`.wall-window`), absent from `isSolidType()`/
+  `isSlabType()`, from the meow sweep and from `handleOverlapSystems()`. The same "decorative twin of a
+  real thing" arrangement as `pipe` is to `portal` — and here the twin is load-bearing, because a
+  `sweeper`'s window **is** a `.wall-window`. Its size is fixed in CSS rather than read from the data:
+  every window in a facade has to be the same one, or the sweeper is identifiable on shape alone. Cold
+  glass only, never warm; the goal window is the one warm light below the roofline. z-index 1 puts it
+  behind anything bolted to the wall, so a balcony railing crosses in front of the glass.
+  Optional `variant` picks a second drawing at the **same 50x64 opening** — currently only `scullery`,
+  which goes above a laundry line: six small panes instead of four, and the sash pushed up so the bottom
+  is dark and open, which is what ties it to the rope below. A window over a washing line is the point;
+  washing on a blank wall looks unexplained. This is safe for the sweeper **only while the plain drawing
+  stays the common one** (11 plain against 2 scullery today) — she hides by being an ordinary window, so
+  if variants ever outnumber the plain one she becomes the odd window out.
+- `sign` / `ivy` — the second half's dressing, on the same code path as the three below (the
+  `WALL_FURNITURE` map in `game.js`: type → drawing class, sized from whatever `width`/`height` the
+  data gives). A `sign` is a vertical **neon sign fixed flat to the wall**, its `text` set upright —
+  flat because a blade sign seen side-on is a panel with a level top sticking into the gap, i.e. a
+  ledge. **Magenta**, by elimination: cyan is the checkpoint's colour and warm light is the goal's.
+  It flickers on the tube only (`neonFlicker`), never the board. Keep it out of frame of the goal.
+  With `secret: true` it hides a catnip sushi a meow can shake loose — see Catnip below; keep a ledge
+  under any secret sign, since that is where the roll lands.
+  `ivy` climbs out of the dark at the bottom of the shaft, rooted below the frame, and is the quiet cue
+  that ground exists under a level that no longer draws it. Leaves only — straight stems are vertical
+  lines across the brick courses, the graph-paper trap — on coprime tile sizes, masked into a mound so
+  it has no top edge at all.
+- `downpipe` / `ladder` / `laundry` — level 2's wall furniture, all pure scenery: absent from
+  `isSolidType()`/`isSlabType()`, from the meow sweep and from `handleOverlapSystems()`, exactly like
+  `window`. Sized from the **data** rather than from CSS, which is the opposite of a `window` (a window
+  is CSS-fixed so the sweeper can hide among identical ones; these have no twin to match, and a
+  downpipe that cannot choose its own length is pointless). All three sit at z-index 1 beside
+  `.wall-window`, so ledges cross in front of them.
+  Each one's *shape* is doing safety work, because nothing in this level may look like footing unless
+  it is a 15px slab: the pipe is vertical so it presents no horizontal line; the ladder is **broken**,
+  its lower rungs replaced by two snapped stubs, because an intact ladder in a game with no climbing is
+  an offer the player can't take; the rope **sags** and carries washing, so it never shows the flat
+  pale-topped edge every real ledge has.
+  Both `ladder` and `downpipe` take `side` to mirror. On a pipe it picks which way both **knees** turn:
+  each end of a run bends a right angle into the masonry, because cut off square it reads as a length of
+  pipe lying on the wall rather than as plumbing. The elbow is a **true 90° on screen** — barrel vertical,
+  arm horizontal — and the **45° lives in depth**, the arm turning away from the viewer into the wall.
+  Drawing that as a literal diagonal is wrong and was tried: a diagonal depicts a pipe bending 45° *along
+  the face* of the wall, a bend no plumber would make, and at this size it reads as a snapped-off stub.
+  The depth comes from a perspective taper (far end shallower than the joint), the arm falling into shadow
+  as it turns away from the gap, and keeping the projection short — 12px against a 9px barrel. The knees
+  turn *away* from the gap on purpose: one turning out into open air would be a spout, and a spout wants
+  something underneath it. The right wall is written out explicitly rather than mirrored with
+  `scaleX(-1)`, because flange, shadow ramp and taper each have a handedness.
+  A pipe is also **quieter than it first was**: the barrel highlight came down from luminance ~101 to ~76
+  against a wall that runs 39 at its outer face down to 11 at the gap. Cast iron on soot-stained stone is
+  a near-value relationship, and the first cut read as chrome.
+  Ropes run **along** a wall, not across the gap. The spanning version was tried and dropped — it is the
+  iconic arrangement, but a near-horizontal line across the shaft is the one silhouette here that reads
+  as something to land on, and the middle of the span had no ledge under it, so reaching for it was
+  simply a fall.
+  Placement is nearly forced and worth reading the level data's note on: windows and gargoyle sprites
+  already claim x 14-76 and x 0-66 on the left wall and x 306-368 and x 334-400 on the right, leaving
+  only x 76-110 and x 270-306 clear — both at the walls' inner faces, which is where a light well's
+  pipework belongs anyway.
+- `sweeper` — level 2's ambush hazard: an old woman who looks like a shuttered window
+  (`.sweeper`/`.sweeper-window`, same lintel-and-sill stone as `.sash-window`) until Bumbot enters
+  her proximity zone, then leans out and swats. `side` picks the wall exactly like a ledge's, and
+  which way the rig mirrors (`.sweeper-right .sweeper-rig { scaleX(-1) }`, the same one-drawing
+  trick a pigeon's `--wing` uses). Overlap-only and absent from `isSolidType()`, but unlike every
+  other hazard she runs her own **state machine** (`updateSweepers()`, called from `stepPhysics`
+  right after the birds): `idle` → (proximity) `telegraph` → `swing` (the only lethal state,
+  checked in `handleOverlapSystems()` against a reach rectangle extending `sweeperReach` out from
+  her wall) → `cooldown` → back to `idle`. Sonic Meow shatters her like any other enemy, but **only
+  while her window is open** — `telegraph` or `swing`. Idle, or back in `cooldown` with the sash shut,
+  she is just a window, and a meow that broke one would expose her from a screen away and spend the
+  ambush before it happened. Tier 1 catnip, too, treats her like every other hazard: if the broom
+  connects while he is on catnip, she shatters and is gone for the rest of the run (`active = false`
+  takes her out of `updateSweepers()` too).
 
-The zone's *goal* is a cat feeder (`#goalFeeder`), a static child of `#world` positioned by
-`applyZoneGeometry()` — not a level object. It shares the `.feeder` class with nothing else,
-which is why level clearing keys on `.level-entity` instead of type classes.
+  Either way **only she breaks — the window stays.** `shatterEntity()` hands a sweeper to
+  `shatterSweeper()`, which bursts and shrinks `.sweeper-rig` alone, then removes the mask and clears
+  `.active`/`.swinging` so the sash swings shut and the light goes off. Shattering the whole element
+  left a window-shaped hole in the wall. The sash waits the 400ms out on purpose: it sits in front of
+  the figure, so closing it at once would hide her break. Only the swing
+  counts as contact — idle she is a window and the telegraph is still look-don't-touch. She used to
+  merely flinch back into `cooldown`, which made her the one enemy catnip could not get rid of. See
+  Catnip below for why every new hazard has to opt into that check by hand.
+
+  **Placing one is where she goes wrong**, and both failures are silent — she runs her whole
+  animation and simply never connects. Her lethal rectangle is her window's own box grown out by
+  `sweeperReach`, so: mount her `x` where the stroke lands where you want it (her reach is measured from
+  it — at 0 on a 110px-wide wall she is set into the far side of her own building and sweeps 60px of
+  brick), and mount her `y` just above the ledge she guards, because the band is her window's vertical
+  span — a window mounted a comfortable 75px up cannot reach a 45px cat standing below it, at any x, on
+  any frame. How much of the ledge is threatened is an `x` decision, not a `reach` one: level 2 leaves
+  the outer ~35px unswept on purpose, so there is a pocket to land in and watch her swipe short. The
+  telegraph gets its air time from `sweeperDetectVPad`, and that pad wants to stay *small* — pad it
+  generously and she burns the whole telegraph while he is still falling, so the broom turns lethal on
+  the frame he lands, which is unavoidable rather than hard.
+
+  Mounting her where she can reach also means she **overlaps Bumbot**, and all of her belongs *behind*
+  him, at z-index 5 with the other windows in this wall. That is structural, not aesthetic:
+  `.sweeper-mask` clips her to the window opening, so the figure is inside the wall by construction and
+  can never be in front of it. Two attempts went wrong from the same false premise — that "she reaches
+  into his space", which is true of her hitbox and not of her drawing. z-index 12 on the whole element
+  put her window over him; splitting the window behind and the figure in front left him sandwiched
+  between two halves of one object.
+
+  Her window is a real **opening**, not a painted pane: the glass sits on a `.sweeper-sash` child that
+  swings out on `.active`, and the window box itself is the dark room behind it. Idle, the sash covers
+  the opening and she is indistinguishable from the decorative `window` entities down the facade. Two
+  layering rules hold inside her: `.sweeper-mask` must sit **above** `.wall-window`'s z-index 1 or the
+  glass paints over the figure (which is what happened when the shared window drawing gained a z-index
+  and the mask lost one — only the broom, on the part of the mask outside the window's box, stayed
+  visible), and the sash sits above the mask, because it is the pane she leans past.
+
+  She also needs a **lit** interior on `.active`, or she is black on black: she reads as a silhouette in
+  a lit opening, not as a drawn figure. That light is **cold**, like the `window` entities' glass — the goal
+  window keeps the only warm light below this roofline.
+
+  That mask is also the thing that has to grow when `sweeperReach` does. It clipped at the window's own
+  box, so the outer 21px of the swing — the part crossing the ledge he stands on — was invisible while
+  still killing him. Its clip needs to be **vertical only** (above the lintel, below the sill, which is
+  all the tuck needs); it now runs 80px out into the gap. Two knock-ons: the right-hand mirror moved from
+  `.sweeper-rig` up to `.sweeper` so the reach mirrors with it, and `.sweeper-rig`'s `left` had to stop
+  being `50%`, which silently meant 50% *of the mask* and shifted her out of her own window.
+
+The goal is not a level object in either level, but it is a different thing in each. A horizontal
+level's is the cat feeder (`#goalFeeder`), a **static** child of `#world` positioned by
+`applyLevelGeometry()`; it shares the `.feeder` class with nothing else, which is why level clearing
+keys on `.level-entity` instead of type classes. A vertical level's is a `.goal-window` div that
+`generateLevel()` **does** generate from `level.goal` — and `applyLevelGeometry()` hides
+`#goalFeeder` outright, since a feeder makes no sense partway down a wall.
+
+The goal window needs **footing of its own**: `hasReachedGoal()` only fires while he is grounded, so
+level 2 puts a plain stone `platform` (the sill) with its slab top exactly at `goal.y`, wider than the
+window so he can land short and walk the last step in. Without the grounded test the win fired the
+moment a falling box clipped the top of the window, then `startWindowEntry()` snapped him down — a
+visible teleport. The sill is an ordinary ledge on purpose; what marks it out is
+`.goal-window::after`, a pool of lamplight painted onto its top edge. Because he is already standing
+there, `startWindowEntry()` does not move him or turn him at all — see Winning below.
 
 `isSolidType()` / `isSlabType()` decide collision behavior — extend those rather than adding
 type checks inline. Removal pattern: set `active = false`, animate, then `setTimeout(remove)`.
@@ -175,8 +458,11 @@ with.
 
 ## Ground, pits and falling
 
-The ground is **not** a single div. `buildGround()` emits a `.ground-segment` for each
-stretch between the zone's `pits`, plus a `.pit` void div per gap. `isOverSolidGround(x)`
+The floor is chosen by `buildTerrain()`, from data rather than the axis, and the two levels want
+opposite things from it.
+
+**Horizontal.** The ground is **not** a single div. `buildGround()` emits a `.ground-segment` for
+each stretch between the level's `pits`, plus a `.pit` void div per gap. `isOverSolidGround(x)`
 tests the cat's *centre* (x + 17) against the pit list, which keeps ledges forgiving instead
 of making a 1px overhang fatal.
 
@@ -192,9 +478,32 @@ Consequences worth knowing: the ground clamp at `catY <= 0` is now conditional, 
 frame. A pit is the one hazard a meow cannot remove — that's deliberate, and it's what keeps
 the no-snack route honest.
 
+**Bottomless (level 2).** `level.bottomless` means there is no floor: `buildTerrain()` draws
+nothing, the `catY <= 0` clamp never lands him, and the standing branch drops him if he is somehow
+at 0. In a vertical level the off-screen rule (`catY < cameraViewY - offScreenDeathDrop`) gets him
+first; `fallDeathY` is the backstop that would cover a horizontal one. Either way it plays as the
+`'pit'` death — he simply falls out of sight, exactly as into a level 1 alley.
+
+It replaced a lethal `.street` segment (`lethalFloor`). That was a floor drawn only so it could kill
+on contact, and it made the bottom of the shaft read as a room with a deadly carpet rather than as a
+drop. Two consequences of losing it:
+
+- The walls now start at the very bottom of `#world` (`y = -40`, the lowest line the camera ever
+  shows) rather than standing on the street, or the frame would end in a strip of sky.
+- The camera's bottom clamp — the bottom of the world — is now the thing that frames the end of the
+  level. It is already pinned there once he stands on the last balcony, so the goal window and its
+  sill are in shot with ~140px of bare wall below them, and that wall is the drop.
+
+The dash does not bridge a bottomless level: a 4× run across a level 1 alley still has a far roof to
+land on, and here there is no far side.
+
+Level 2 has no `pits` at all (`pits: []`). The clear 120px slot down the middle of the shaft is not
+a barrier and doesn't need to be: hugging it is a fall straight out of the frame, so the shortcut
+punishes itself.
+
 ## Birds
 
-`zone.birds` entries carry `{x, y, axis, min, max, speed}`, and **`axis` picks the species as well
+`level.birds` entries carry `{x, y, axis, min, max, speed}`, and **`axis` picks the species as well
 as the behaviour**, because on a rooftop they are the same thing:
 
 | `axis` | Species | Behaviour |
@@ -208,7 +517,8 @@ species needs its own collision code. `generateLevel()` adds `.bird` plus `.pige
 the stylesheet keys both the artwork and the lighting off the species class.
 
 **Nothing here is an emoji any more.** Each bird is a clone of a `<template>` at the bottom of
-`index.html` — `#pigeonSprite` or `#crowSprite` — a template rather than a live node because there
+`index.html` — `#pigeonSprite` or `#crowSprite`, alongside `#gargoyleSprite` which a `gargoyle` ledge
+clones the same way — a template rather than a live node because there
 are many of them, and their parts carry **classes** (`.pig-head`, `.crw-wing-near`, …) rather than
 ids for the same reason. Real pigeon greys with a warm beak and feet and a visible
 eye, wearing only Bumbot's rim light: the `brightness(0) invert()` flattening that a glyph needed
@@ -238,8 +548,40 @@ the wing geometry is ever changed.
 The pigeon sprite's ink spans roughly `y+3` to `y+33` against a hitbox of `y+8`..`y+32`, so its
 legs stick out below the lethal band. That is deliberate and forgiving; the hitbox was not touched.
 
-Placement rules live in `map.js`'s header: a walker's patrol range stays inside one roof, speed
-≤ 2, and never on the landing side of an alley.
+Placement rules are per level and live in each level file, not in `map.js`. Level 1's (its header): a
+walker's patrol range stays inside one roof, speed ≤ 2, and never on the landing side of an alley.
+
+Level 2's (the comment above its `birds`) cannot reuse that last rule, because every ledge *is* a
+landing side. Instead every bird must be readable from the ledge above and beaten by waiting:
+
+- **Corridor crows** cross the drop between two ledges, with their hitbox kept off both standing
+  bands, so they threaten only the fall. Their x range must cover where he actually is when he
+  passes their height — a walk-off is still near the wall it left at mid-height, so a crow centred
+  in the gap meets almost nothing. They sit flush under the lip he steps off, and run long (230–260px),
+  limited only by the frame edge and the stone hanging under the ledge above.
+- **The skimmer** (over the 625 balcony) does hit a standing cat. It clears the railing by a few px,
+  which a tapped jump does not but a held one does.
+- **Windowsill pigeons** patrol the wall end of gargoyle ledges with a window above. That is never a
+  balcony (they would walk through the iron, and z-index would put them in front of it), never the
+  checkpoint ledge, never near the sweeper. The outer lip he leaves by stays clear; the threat is the
+  landing.
+- **The opening two** walk the **top rail** of the first balcony's railing and the bare ledge at
+  3755. Walking *on* the iron is the one case where a bird on a balcony is right: z-index 12 in front
+  of the railing is then correct rather than a bug. The rail walker sits at 3983 rather than 3986
+  because the pigeon sprite's feet are ~3px above its box bottom, which hovers visibly on a thin rail.
+  The last balcony (above-right of the goal) has a matching rail walker at 263, bookending the level;
+  unlike the first, its patrol does meet the default landing, so it is beaten by timing the drop.
+  The 3755 walker patrols the **whole** ledge, slowly: he lands against its wall and leaves by its
+  lip, so a half-ledge patrol would always sit on one or the other. Never the starting roof (the
+  walk-in locks input). A pigeon on the opposite roof was tried and dropped — a bird he can only reach
+  by a pointless jump made no sense.
+- **Perched pigeons** (three) are placed against the line rather than timed: clear of the default
+  landing, punishing an overshoot, or — on the gargoyle at 375 — standing between him and the lip as
+  the one bird he must jump. A perched bird is static and visible, so unlike a moving one it may sit a
+  screen from the sweeper.
+
+Everything in level 2 moves slower than level 1 (crows 1.5–2.0, walkers ≤ 1.2): he meets birds on
+landing or waits on them at a lip, with less room to react than on a run-up across a roof.
 
 ## Movers and carrying
 
@@ -248,70 +590,174 @@ delta to `catX`/`catY` when `groundedOn` is that mover. `groundedOn` is set on l
 refreshed each frame while grounded.
 
 Carrying deliberately skips collision resolution, so a horizontal mover can push Bumbot into
-a wall. Zone 1 keeps movers well clear of pillars for exactly this reason; if you place one
+a wall. Level 1 keeps movers well clear of pillars for exactly this reason; if you place one
 near a wall, expect to add push-out handling.
 
 ## Game loop
 
 One `update(timestamp)` driven by `requestAnimationFrame`, which measures `dt` in units of
-"60fps frames" and advances `stepPhysics(slice)` in slices of at most 1. Every tuning
+"60fps frames" and advances `stepPhysics(slice)` in slices. Every tuning
 constant is therefore still authored as a per-60fps-frame value and keeps that meaning at
 any refresh rate — when adding movement or particle motion, scale it by `dt` (or by the
 `dt` handed to `stepPhysics`) or it will silently become frame-rate dependent again.
 
-The sub-stepping is not cosmetic: a single large step could carry Bumbot straight through a
-15px platform slab without ever overlapping it. `dt` is clamped to `maxCatchUpFrames`.
+The sub-stepping is not cosmetic, and it has **two independent limits**:
+
+- **at most one frame per slice.** A single large `dt` could carry Bumbot straight through a 15px
+  platform slab without ever overlapping it. `dt` itself is clamped to `maxCatchUpFrames`.
+- **at most `maxSliceTravel` (10px) of *fall* per slice.** Time-slicing alone stopped being enough
+  once a level ran downward: falling the height of a 620px portrait reaches ~31px per frame, which
+  clears a 15px ledge in one step no matter how small `dt` is. This is deliberately a
+  *subdivision*, not a speed cap — capping velocity would have changed how level 1 falls, whose
+  tallest drop already peaks at ~14.7px/frame. Keep `maxSliceTravel` below the 15px slab thickness.
 
 Speed lives in the tunables block at the top of `game.js`. Jump apex is
 `jumpForce² / (2 * gravity)` ≈ 141px against a 135px tallest platform, so those two
 constants must be rebalanced together — bumping `gravity` alone makes platforms
-unreachable, and it invalidates `map.js`'s design budget.
+unreachable, and it invalidates **both** level files' design budgets (level 2's ledge spacing is
+derived from fall time against jump distance).
+
+That 141px is the **held** jump. Releasing the key while still rising clips the climb to
+`jumpCutSpeed` (7.5, ≈ 35px apex) — handled in `keyup`, not in the physics step, and applied only
+while `velocityY > jumpCutSpeed` so it can never brake a fall or fight the launch impulse. Level 1
+never notices, because its tall platforms are cleared by holding.
+
+It exists for level 2's balcony rails. With a single fixed impulse, a mandatory jump off a balcony
+launched him the full 141px and roughly doubled his airtime — a ~158px walk-off became a ~337px arc
+across gaps needing only 55-145px, which is not what either level file's reach budget describes. A tap
+now clears the 26px railing by ~9px, with ~67px of horizontal room to pass the 6px collider, and lands
+around 237px. It is a **ceiling rather than a multiplier** on purpose: the shortest possible hop is the
+same height however early the key comes up, so minimum clearance over a railing is a fixed number
+instead of a function of reaction time.
 
 `update()` early-returns when `gameActive === false`, which **terminates the loop
 entirely** — whoever cleared the flag must restart it with `requestAnimationFrame(update)`
 *and* reset `lastFrameTime = 0`, so the pause isn't billed as one enormous frame. Existing
 restart sites: `triggerHurtReset()` (after the death animation, 520-800ms depending on cause) and
-`loadZone()`.
+`loadLevel()`. The page now *loads* with the flag clear, because it opens on the title card.
 
 Two reset paths, deliberately different:
-- `triggerHurtReset(cause)` (death) — returns to `respawnX` (the checkpoint pipe if passed, else
-  the zone's spawn), keeping score and level state. It has **two presentations**, and neither
-  flashes the screen or shakes him — the read is entirely on the sprite, which is the payoff of
-  rigging him:
+- `triggerHurtReset(cause)` (death) — returns to `respawnX` / `respawnY` (the checkpoint if passed,
+  else the level's own spawn), keeping score and level state. A death **never** costs you more than
+  the current level. Both axes are tracked because level 2's checkpoint is a window partway *down*:
+  respawning at `y = 0` there would drop him into the bottomless shaft. It has **two presentations**, and
+  neither flashes the screen or shakes him — the read is entirely on the sprite, which is the payoff
+  of rigging him:
   - contact with wire or a bird: `.cat-spooked` on `#cat` reveals `bbFur` (spikes along his back),
     puffs the tail and pins the ears, then 200ms later `.cat-bail` on the container hops him up
     and drops him off the bottom of the screen. 800ms total.
   - `cause === 'pit'`: no fright and no hop, because he is already falling — `.cat-plunge` just
-    carries him the rest of the way down. 520ms total.
+    carries him the rest of the way down. 520ms total. Falling out of the bottom of a vertical level's
+    frame uses this too, since it is the same story.
 
   Both are clipped by `#gameWindow`'s `overflow: hidden`, which is all "off screen" needs to mean.
-  The respawn hand-draws `left`/`bottom` before `playPipeEmerge()`, because the loop is still
-  stopped and he would otherwise play one frame of climbing out of a pipe wherever he died.
-- `loadZone(i)` — full reload: geometry, score back to 1, `respawnX` back to spawn, level
-  regenerated, victory-munch classes cleared. `handleWinButton()` and `resetGame()` both route
+  The respawn hand-draws `left`/`bottom` **and calls `applyCamera()`** before `playPipeEmerge()`,
+  because the loop is still stopped and he would otherwise play one frame of climbing out of a pipe
+  wherever he died, at whatever scroll position the camera was left at.
+- `loadLevel(i)` — full reload: frame, geometry, score back to 1, respawn back to spawn, level
+  regenerated, victory classes cleared. `handleWinButton()` and `resetGame()` both route
   through it, and `handleWinButton` is called from an inline `onclick` in `index.html`, so it
-  must stay a global function.
+  must stay a global function. It hand-draws its opening frame for the same reason the respawn does.
 
-Both end by calling `playPipeEmerge()`, because both spawn points have a `pipe`/`portal` in the
-level data and Bumbot always arrives by climbing out of one. That helper goes through
-`playBodyAnimation()`, so `cat-emerge` has to stay in that function's removal list or a second
-emerge won't replay.
+Both end by calling `playArrival()`, because Bumbot never simply blinks into existence — but *how* he
+arrives is per-level data, not a constant:
 
-## Winning (the munch sequence)
+| `level.arrival` | What happens | Used by |
+|---|---|---|
+| `'emerge'` (default) | `playPipeEmerge()` — climbs out of the pipe/window at the spawn | level 1 |
+| `'walk-in'` | Walks on from off screen, **input locked**, stops at `arrivalStopX` | level 2 |
+| `'drop'` | Walks off the roof and falls onto the first ledge, **input locked**, then hands over | — |
+| `'stand'` | Nothing. He is already there. | — |
 
-Crossing the win line does **not** show the win screen immediately. `startVictoryMunch()`
-clears `gameActive`, snaps Bumbot to the bowl, hand-draws that final position (the loop has
-already stopped, so nothing else will), runs the `.munching` chew loop with crunch tones,
-empties the bowl via `.eaten`, and only after `munchDuration` reveals the overlay. The delay
-exists because `#winScreen` is a full-window cover — show it right away and the animation is
-invisible. Both classes are cleared in `loadZone()`.
+A **checkpoint always overrides this with `'emerge'`**, whatever the level says, because a checkpoint
+is by definition a thing he squeezes out of. `respawnArrival` tracks which one the *current* respawn
+point uses, so dying before level 2's checkpoint replays the walk-in and dying after it climbs out
+of the window.
+
+Neither scripted arrival is a CSS animation — both are the real physics engine with the player's hands
+tied, so he ends up wherever collision actually puts him rather than wherever a keyframe guessed.
+`introHold` locks input (checked in `keydown`, and `advanceIntro()` overwrites the key state each frame
+so a key already held cannot steer it). `advanceIntro()` runs at the top of `stepPhysics` *before* input
+is read, and tests its end condition before re-forcing the key, or he takes one extra step past it. The
+two shapes end differently, which is why `introMode` exists: `'drop'` ends once he is grounded below
+where he started; `'walk-in'` never leaves the ground at all, so it ends on reaching `introStopX`.
+
+Level 2's walk-in starts at `spawnX: -70` — **off the left-hand edge of the world**. That works because
+`worldWidth` equals the frame width there, so `cameraForX` clamps to 0 and never pans, and everything
+left of 0 is permanently clipped by `#gameWindow`; and because only the left-walk branch clamps `catX`
+to 0, so walking rightward out of negative x needs no special case. The catch is *floor*: the roof
+platform is widened to `x: -90, width: 200` so there is deck under him while he is still off screen. Its
+right edge stays at 110, so the roof still reads as the flush 110px one.
+
+It replaced a `'drop'` arrival that walked him off the roof onto the first balcony automatically, which
+spent the level's opening move before the player had touched a key. `'drop'` is still supported.
+
+`playPipeEmerge()` goes through `playBodyAnimation()`, so `cat-emerge` has to stay in that function's
+removal list or a second emerge won't replay.
+
+## Winning (two sequences)
+
+Reaching the goal does **not** show the win screen immediately, in either level: `#winScreen` is a
+full-window cover, so showing it right away makes the animation underneath invisible.
+`hasReachedGoal()` clears `gameActive` and `startVictorySequence()` picks the ending that matches
+what the level's goal actually *is*. Both hand-draw their final frame, because the loop has already
+stopped and nothing else will draw it, and both finish through `revealWinScreen()`, which owns the
+overlay copy and the fanfare.
+
+- **`startVictoryMunch()`** (horizontal) — snaps him beside the bowl (38px back, or his 50px box
+  hides the thing the sequence is about), runs the `.munching` chew loop with crunch tones, empties
+  the bowl via `.eaten`, waits `munchDuration`.
+- **`startWindowEntry()`** (vertical) — runs `.cat-enter` from **exactly where he stands and the way
+  he faces**, which is deliberately the exact reverse of `catEmerge`: every entrance and exit in this
+  game is Bumbot squeezing through a gap too small for him. No snap — it used to place him at a fixed
+  spot facing right, which made him hop and turn round whenever he came at the window from the other
+  side. `catEnter`'s 19px slide is `var(--face)`-signed like `catEmerge`'s, so he carries on the way he
+  was walking. Waits `windowEntryDuration`.
+
+`.munching` and `.cat-enter` are both cleared in `loadLevel()` and `showStartMenu()`.
 
 ## Camera & parallax
 
-`cameraX = clamp(catX - 350 + 25, 0, worldWidth - 700)`, applied as `world.style.left`.
+`cameraForX(x) = clamp(x - windowWidth/2 + 25, 0, worldWidth - windowWidth)`, applied as
+`world.style.left`. `cameraForY(y)` is the same shape against `windowHeight` / `worldHeight`, and
+`applyCamera()` writes it to `world.style.bottom` **only in a vertical level**. Note that the frame
+size is per-level now, so nothing may assume 700×350.
+
+In a vertical level `worldWidth` equals the frame width, so `cameraForX` clamps to 0 on its own and
+the camera simply never pans sideways — no special case is needed for that.
+
 Background layers scroll via `backgroundPositionX` on `#farBuildings` (0.15×) and
 `#nearBuildings` (0.40×) — they are `repeat-x` tiles, so they scroll infinitely. Don't
-translate those elements; that was the earlier broken approach.
+translate those elements; that was the earlier broken approach. Both are **hidden** in the facade
+theme: they are a skyline anchored to a horizon that setting doesn't have, and `#skyBg`'s violet
+radial is overridden there too — between two walls it read as a bright purple column, the brightest
+thing on screen in the one place nothing should draw the eye.
+
+The two wall faces are generated per level into `#world` by `buildWalls()` from `level.walls`
+(`{ side, width, top }`). They were originally painted on the frame as `::before`/`::after`, on the
+reasoning that the masonry is identical all the way down so there is nothing to scroll. That was
+wrong for one specific reason: **a wall painted on the frame can never end anywhere.** Level 2's left
+building has to stop at the roof deck Bumbot starts on — the patch of open sky above his head (291px
+of the 620px frame at spawn) is the only thing that makes the opening read as "off a rooftop" rather
+than "off another ledge". **Both** walls end at 4110 with sky above them, and each carries a `roof`
+ledge as its deck, so the opening is two facing rooftops at the same height — different *widths* (110
+and 130) rather than different heights. The right one's deck is a real `platform`, not scenery: it is
+the same drawing as the one he is standing on, and this level's art rules forbid anything that looks
+like footing without being it.
+
+Two dead ends there, both easy to re-invent:
+
+- **A decorative second roofline** painted across a wall that carries on past it (the right wall used
+  to run to 4450 with a cap drawn at 4110). A rooftop with 340px of masonry standing on it reads as a
+  ledge whatever it is drawn like. Move a wall's `top` instead.
+- **Ending below `worldHeight` is not the same as ending on screen.** `camera = catY - 289`, so standing
+  on level 2's first balcony (catY 3960) puts the frame top at 4291; a wall topping out at 4270 ends 21px
+  above the visible edge, against a sky within a few points of the masonry's own value, and looks
+  exactly like a wall that never ends. Whatever a wall's top is, it needs room above it.
+
+Consequences: the walls scroll, so their staining drifts past as he descends; each carries a parapet
+coping at its own top (`.facade-wall::before`); and the roof deck is flush with its wall (130 wide,
+no overhang, no corbel) because it is the top of a building rather than a slab bolted to one.
 
 Each skyline layer is several gradient bands on **coprime tile widths** (900/700/1100 and
 820/1300/540) anchored with `background-position: 0 100%`, which is what keeps the city from
@@ -319,39 +765,141 @@ reading as visibly repeating wallpaper. Two consequences: the CSS sets the short
 JS can override `background-position-x` alone and keep the bottom anchoring, and adding a
 band on a width that shares a factor with the others will reintroduce a short repeat.
 
-The same camera clamp is duplicated inside `triggerSonicMeow()` to find the visible bounds.
-If you change camera math, change both.
+The camera clamps are wanted in several places — the loop, `triggerSonicMeow()`'s visible bounds,
+the still frame behind the title card, the respawn, and `loadLevel()` — so they live in
+`cameraForX` / `cameraForY` with `applyCamera()` doing the writing. They used to be copied into the
+meow by hand; don't re-fork them.
+
+## The start menu
+
+The page opens on `#startScreen`, not in play: `gameActive` starts `false`, `menuActive` starts
+`true`, and the bottom of `game.js` calls `showStartMenu()` — unless `?level=N` asked for a
+specific level, in which case it calls `loadLevel()` directly and skips the card.
+
+The card is deliberately **translucent over a real still frame** — `showStartMenu()` builds level 1,
+parks Bumbot at his spawn pipe, then hand-draws that one frame (`catContainer` position plus
+`applyCamera()`) because the loop is not running and nothing else will draw it. Anything that stops
+the loop and moves him has to hand-draw, exactly as the respawn and the victory sequences do.
+
+- `menuActive` is checked in `keydown` *after* `trackCatnipCode()` (so the stash can still be
+  found from the menu) but *before* the `gameActive` guard, where it takes Enter/Space as Start
+  and swallows everything else — that's what stops a `Space` press to start from also being
+  buffered as a jump.
+- `handleStartButton()` and `showStartMenu()` are both called from inline `onclick`s in
+  `index.html`, so like `handleWinButton()` they must stay global functions.
+- `loadLevel()` clears `menuActive` and hides the card itself, so every route into a level leaves
+  the menu behind whether or not it came through Start.
+- Start is also the user gesture browsers require before an `AudioContext` will sound, so the
+  level's opening tones are now the first ones that reliably play.
+- `#menuCat` is a `cloneCatSprite()` snapshot, built once. Its ids are gone, so none of the
+  id-driven part animations reach it — the breathing is `catIdle` on the box instead. Give the
+  parts class hooks if the menu ever needs a tail sway.
 
 ## Sonic Meow
 
 `M` key. Costs one snack (`snacks`, which doubles as ammo; starts at 1). Destroys every
-pillar, spike, and bird currently on screen, spawning rubble bursts. Pits and movers are
+pillar, spike, and bird currently on screen, plus any sweeper whose window is open (leaning out or
+swinging — never one hiding behind a shut sash), spawning rubble bursts. Pits and movers are
 immune. Zero snacks plays a low reject tone instead.
+
+"On screen" is tested on **both axes** by the local `onScreen(x, y)` helper. An x-only test was
+fine while every level was a long horizontal strip, but in a portrait level every entity shares the
+same narrow x range — so one meow would have cleared the entire level.
+
+The ripple is positioned by `bottom`, in the same `40 + y` convention as every other entity, which
+is why `.sonic-ripple`'s transform is `translate(-50%, 50%)`. It used to be positioned from the top
+against a hardcoded `310` (the 350px frame minus the ground) — exactly the kind of assumption a
+620px portrait frame breaks.
 
 ## Catnip (hidden dev mode)
 
-Typing `CATNIP` toggles a developer mode, framed in-fiction as Bumbot finding a stash. It
-grants: hold `Shift` for the **dash**, `[` / `]` to warp ±1500px (snapped to solid ground via
-`nearestSolidX()` so you never land in a pit), `G` to toggle invulnerability, and a telemetry
-readout (x / fps / grounded) in the HUD. While active, Bumbot's outline turns catnip-green and
-a `🌿 CATNIP` tag shows, so you can never mistake cheat mode for normal play.
+Typing `CATNIP` toggles a developer mode, framed in-fiction as Bumbot finding a stash. It has **two
+tiers**, and the split is deliberate: the first is discoverable by just walking into something, the
+second needs a key.
 
-The dash (`isDashing()` — catnip mode plus `Shift`) is 4× speed and nothing stops him:
-horizontal and airborne solid collision are both skipped so he runs through platforms and
-movers, pits are treated as whole ground, and pillars, spikes and birds are destroyed on
-contact via the shared `shatterEntity()` / `vaporizeBird()` helpers. The checkpoint portal,
-snacks and the win line are all overlap-only, so they keep working normally at dash speed —
-every hitbox window is at least 63px against a 28px-per-slice step, so nothing gets skipped.
+**Tier 1 — catnip on, no key held.** Anything alive or sharp dies on contact instead of killing him:
+birds vaporize, spikes shatter, via the shared `vaporizeBird()` / `shatterEntity()` helpers. Gated on
+`catnipMode` alone (the `smashesHazards` flag in `handleOverlapSystems`).
+
+What tier 1 pointedly does **not** do — and this is the whole shape of the design:
+
+- **Geometry stays solid.** Pillars, platforms and movers still block him. The pillar-shatter branch
+  stays gated on `dashing`, because catnip alone can never reach the inside of a pillar to trigger it.
+- **Falling still kills.** Pits, `bottomless` and the vertical off-screen rule all ignore catnip.
+
+So tier 1 makes him invincible to *things* without letting him ignore the level.
+
+**Tier 2 — hold `Shift`.** The dash: `isDashing()` (catnip mode plus `Shift`) is 4× speed, and
+geometry splits into two kinds. This split is load-bearing, and the reason is level 2:
+
+- **Pillars are obstacles** and lose — destroyed rather than collided with, by `smashPillarsAt()` on
+  the horizontal step and `dashLandingCollision()` on the way down.
+- **Slabs (platforms and movers) are footing.** He is too fast to be stopped *sideways* by one, but
+  he still **lands on top** of one.
+
+The dash used to skip vertical collision as well, which was harmless in level 1 — the only thing
+under you there is the ground — and fatal in level 2, where the ledges *are* the ground: holding
+`Shift` dropped him through every one of them to his death. Don't reintroduce it.
+
+Pits are still treated as whole ground while dashing, so level 1's 4× run crosses the alleys. The
+checkpoint portal and snacks are overlap-only, so they keep working at dash speed; level 2's goal
+wants him standing, which still works because the dash lands on slabs and the sill is one.
+
+Note the one thing a `bottomless` level does not yield to even here: there is no far side to run
+across to, so the dash does not save him from it.
+
+Residual worth knowing: at 4× a walk-off carries him ~4× as far sideways, so in level 2 he pins
+against the far wall and lands on whichever ledges are on *that* wall, skipping the ones opposite.
+Holding a single direction the whole way down can therefore still miss a wall's worth of ledges and
+fall out of frame. Steering with the drops descends the whole level safely.
+
+While active, Bumbot's outline turns catnip-green and the HUD shows `🌿 CATNIP` plus a hint line
+naming both tiers. The hint exists because the mode was previously undiscoverable — the green outline
+said "something changed" but not what, and the only power was invisible until you guessed `Shift`.
+`#devPanel` is a right-aligned column for that reason: the hint is too long to sit in a row beside
+the snack counter in a 400px portrait frame.
 
 Two implementation constraints worth preserving:
 - The code contains **no `M`** — `M` is bound unconditionally to Sonic Meow, so any code
-  containing it would fire a meow per keystroke. That rules out `MEOW`, `BUMBOT`, etc.
+  containing it would fire a meow per keystroke. That rules out `MEOW`, `BUMBOT`, etc. The same
+  constraint applies to the typed `LEVELx` code, which is why it is spelled that way.
 - `trackCatnipCode()` runs *before* the `gameActive` guard in the `keydown` handler, so the
-  code still works while dead or on the win screen. `Shift` keyup is likewise unguarded, or
-  the sprint could stick on.
+  code still works while dead or on the win screen. The `Shift` keydown and keyup are likewise
+  unguarded, or the sprint could stick on.
 
-Session-only by design — nothing is persisted, and `loadZone()` calls `disableCatnip()`, so
-both a reload and a restart-after-finishing give you a clean game.
+When a new hazard is added (the broom, the perched pigeon), it has to opt into tier 1 — i.e. route its
+contact through the same `smashesHazards` check — or catnip will silently fail to protect against it.
+
+Session-only by design — nothing is persisted, and `loadLevel()` calls `disableCatnip()`, so
+both a reload and a restart-after-finishing give you a clean game. The one exception is the
+`?level=N#fast` test URL, which re-arms it *after* `loadLevel()` for exactly that reason.
+
+**It can also be found in the world.** Level 2's SUSHI sign carries `secret: true`: a Sonic Meow with
+the sign on screen rattles it (`.jolted`) and `dropCatnipSushi()` drops a catnip maki roll onto
+whatever slab is under the board — derived, not authored, so the roll can never be left floating.
+Once per run (`secretSpent`). The roll is a runtime-only `sushi` entity in `RuntimeEntities`, picked
+up like a snack; eating it calls `enableCatnip()`, the same entry point as the typed code and `#fast`,
+and plays the same trill. Eating it with catnip already on never toggles it *off*. Because it is the
+same mode, it lasts until the level is reloaded and the HUD hint is what explains it. Everything that
+switches catnip on goes through `enableCatnip()`; everything that switches it off through
+`disableCatnip()`.
+
+## Level select (two ways in)
+
+Neither is part of catnip: skipping to a level is not a power Bumbot has, it's a way for you to look
+at one.
+
+- **Typed `LEVELx`** — type `LEVEL2` anywhere (title card, mid-run, dead, win screen) to jump there.
+  A digit with no level behind it does **nothing at all**, silently, because a wrong guess at a hidden
+  code shouldn't announce itself. Single digit, so levels 1-9. Own buffer, separate from catnip's, so
+  the two codes can't interfere.
+- **`?level=N` URL** — boots straight in, skipping the title card; `#fast` also arms catnip. Handy as
+  a bookmark. Out-of-range falls back to the menu rather than being clamped.
+
+The typed code is why `scheduleFrame()` exists: it can call `loadLevel()` while the loop is still
+running, and every other caller reached `loadLevel()` only once the loop had already stopped. Two
+outstanding `requestAnimationFrame` callbacks would step physics twice per frame. **Never call
+`requestAnimationFrame(update)` directly** — go through `scheduleFrame()`.
 
 ## Audio
 
