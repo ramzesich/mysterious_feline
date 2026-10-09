@@ -53,10 +53,13 @@
 // Vertical levels additionally require:
 //   worldHeight   — the world's height in px. Horizontal levels fall back to the frame height.
 //   spawnY        — the height he starts at, since 0 is no longer a safe floor.
-//   lethalFloor   — true when touching y=0 kills. Falling is the route in a vertical level, so
-//                   the failure state moves to the bottom of the shaft.
-//   goal          — { x, y, width, height }. Overlapping it wins the level, because "the far
-//                   right-hand edge" means nothing when the level runs downward.
+//   goal          — { x, y, width, height }. Standing on something while overlapping it wins the
+//                   level, because "the far right-hand edge" means nothing when the level runs
+//                   downward. Give it footing — level 2's is a sill platform at the rect's bottom.
+//
+// Either axis may also use:
+//   bottomless    — true when there is no floor at y=0: nothing is drawn there, and falling past it
+//                   is death even while dashing. Level 2's shaft, which you fall out of the bottom of.
 // -------------------------------------------------------------------------------------------
 
 const LEVELS = [

@@ -27,8 +27,9 @@
 //   * ONE-WAY. Jump apex is ~141px against drops of 130+, so he can never climb back up. A missed
 //     snack is missed for the run, and the checkpoint is the only mercy in the level — which is why
 //     it sits at the midpoint.
-//   * `lethalFloor` makes the street at y=0 fatal, but it only bites on the last couple of ledges,
-//     where the camera has hit its bottom clamp and can no longer be fallen out of.
+//   * `bottomless` means there is no floor at all, so the rule above holds all the way down. The
+//     camera's bottom clamp (the bottom of the world) is what frames the goal window's sill, and a
+//     miss from the last balcony falls out of that frame like any other.
 //   * Fast falls are why stepPhysics slices by distance: terminal speed down a 620px screen is
 //     ~31px/frame against 15px slabs, which would tunnel clean through a balcony.
 //
@@ -100,12 +101,21 @@ const LEVEL_2 = {
     arrival: 'walk-in',
     arrivalDir: 'right',  // Coming from the left, so he walks rightward
     arrivalStopX: 30,     // Clear of the frame edge and near the middle of a 110px roof
-    lethalFloor: true, // The street at y=0 kills; there is no safe ground in this level
+    // No floor at all. The shaft runs on below the frame, and missing the last sill drops him out of
+    // sight — the same death as an alley in level 1, instead of landing on a street that was drawn
+    // only so it could kill him.
+    bottomless: true,
     pits: [],          // No alleys: the whole level is the gap between two buildings
 
-    // The way out: a half-open window in the LEFT wall, below the last ledge — so the final move of
-    // the level is a drop *into* it rather than onto another balcony. Miss and the street has him.
-    goal: { x: 0, y: 100, width: 110, height: 100 },
+    // The way out: a window in the LEFT wall with the lamp on, sat on its own stone sill (the last
+    // platform below). He wins by STANDING in front of it — landing on the sill and stepping in — not by
+    // clipping it mid-fall. The rect is the window opening itself, which is also how it is drawn.
+    // x 15 centres it on the left wall's window bay (the 50px windows at x 20 centre on 45), and 60x76
+    // makes it the biggest opening on the facade without breaking that bay.
+    // y 100 is the sill's slab top, and it is also where the camera stops: standing on the last balcony
+    // already pins the camera at the bottom of the world, so the frame's lowest edge sits 140px below
+    // this sill, with nothing in it but wall. Miss, and that is the drop.
+    goal: { x: 15, y: 100, width: 60, height: 76 },
 
     // The two buildings. They are different WIDTHS (110 and 130) but their roofs are at the same
     // height, so the opening reads as one street seen from between two facing rooftops. Both walls
@@ -200,9 +210,19 @@ const LEVEL_2 = {
         { type: 'platform', x: 210, width: 190, height: 610, side: 'right', variant: 'balcony' },
         { type: 'platform', x: 0, width: 150, height: 360, side: 'left', variant: 'gargoyle' },
 
-        // === The second floor. From here the camera has hit its bottom clamp, so the first floor
-        // and the street are both in shot — and the drop off this ledge goes through the window.
+        // === The second floor. From here the camera has hit its bottom clamp and stops scrolling, with
+        // the goal window and its sill in shot below and to the left.
         { type: 'platform', x: 250, width: 150, height: 225, side: 'right', variant: 'balcony' },
+
+        // The goal window's sill: real footing, and the last ledge in the level. Drop 140 from the
+        // balcony, needing 365 - 150 - 130 = 85px of travel against ~131 available — 46px of margin,
+        // nearly double the level's 25px floor, on purpose: missing it is the one miss that costs the
+        // whole second half. A plain stone ledge rather than a variant: the lamplight the window throws onto
+        // its top edge (.goal-window::after) is what marks it out, and a railing here would stand in
+        // the opening he has to walk into.
+        // Wider than the window (0-130 against 15-75), so he can land short of the opening and walk
+        // the last step in.
+        { type: 'platform', x: 0, width: 130, height: 85, side: 'left' },
 
         // The first snack sits on the awning (slab tops out at 3205), at its WALL end — so reaching it
         // means walking back along the canvas, away from the onward route, which is down and to the

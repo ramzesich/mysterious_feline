@@ -22,8 +22,8 @@ body {
     overflow: hidden;
 }
 /* The facade theme looks down a gap between two buildings, so the horizon layers have nowhere to
-   sit — they are a skyline anchored to a ground line this setting does not have. The walls and the
-   street replace them. Keyed on the THEME, not on the axis: a future vertical level somewhere else
+   sit — they are a skyline anchored to a ground line this setting does not have. The walls replace
+   them. Keyed on the THEME, not on the axis: a future vertical level somewhere else
    would want its own backdrop, not this one's. */
 #gameWindow.theme-facade #farBuildings,
 #gameWindow.theme-facade #nearBuildings {
@@ -33,7 +33,9 @@ body {
    a skyline, and between two walls it read as a bright purple column — the single brightest thing on
    screen, in the one place nothing should draw the eye. Down here it is the far side of the street,
    most of it in shadow, with the city's glow spilling in at the top and sodium light a long way
-   below. Deliberately the darkest surface in the level so the lit ledges and the way out carry. */
+   below. Deliberately the darkest surface in the level so the lit ledges and the way out carry.
+   That bottom glow is now the ONLY sign of the ground: the street itself is not drawn, so it has to
+   stay faint enough to read as far below the last sill rather than just under it. */
 #gameWindow.theme-facade #skyBg {
     background:
         /* Haze where the alley opens to the sky, and the street glow at the bottom of it */
@@ -1330,26 +1332,11 @@ button.secondary:hover { background: #1b1e2c; color: #aab3c4; }
    outside. First pass — readable geometry, full architecture still to come.
    ============================================================================================ */
 
-/* The street at the bottom of the shaft. Same 40px box as a roof deck, but wet asphalt instead of
-   gravel, and touching it is fatal — it is there to be looked down at, not walked on. */
-.ground-segment.street {
-    background:
-        /* Kerb line and the gutter it drains into */
-        linear-gradient(rgba(120, 116, 108, 0.35) 0 2px, transparent 2px 5px),
-        /* Sodium pools thrown down by street lamps, on a wide cycle so it is not a pattern */
-        radial-gradient(ellipse 70px 14px at 60px 4px, rgba(255, 160, 60, 0.20), transparent 70%),
-        radial-gradient(ellipse 55px 11px at 250px 6px, rgba(255, 160, 60, 0.14), transparent 70%),
-        linear-gradient(#17161c 0 6px, #101015 6px 18px, #0a0a0e 18px 100%);
-    background-repeat: no-repeat, repeat-x, repeat-x, no-repeat;
-    background-size: 100% 100%, 340px 100%, 340px 100%, 100% 100%;
-    border-top: 2px solid #2c2a30;
-}
-/* A street has no parapets — those are the cue that a gap is the space between two roofs, and
-   down here the gap is the whole level. */
-.ground-segment.street::before,
-.ground-segment.street::after {
-    display: none;
-}
+/* There is no street. The shaft has no visible floor: the walls run off the bottom of the frame and
+   the only hint of the ground is #skyBg's faint sodium glow, a long way down. A drawn street was a
+   floor that existed only to kill on contact, and it made the bottom of the level read as a room with
+   a lethal carpet rather than as a drop. Missing the last sill now plays exactly like an alley in
+   level 1 — he falls out of sight. */
 
 /* A ledge growing out of a wall. Declared after .platform so it wins on equal specificity, which
    is how it replaces both the blue safety edge (that is level 1's "static platform" cue and means
@@ -1610,28 +1597,70 @@ button.secondary:hover { background: #1b1e2c; color: #aab3c4; }
                       0 0 18px rgba(0, 240, 255, 0.45); }
 }
 
-/* The way out: a half-open window on the second floor, lit warm from inside. The one friendly
-   thing in the level, and the only warm light below the roofline — which is what makes it read as
-   the goal from a long way up. */
+/* The way out: a window on the second floor with its sash shoved up and the lamp on inside. The one
+   friendly thing in the level, and the only warm light below the roofline.
+
+   It has to read as a WINDOW, which the first cut did not: a flat amber box the full width of the
+   wall, with nothing to stand on, read as a lit panel or a sign. Three things fix that, and they are
+   the same three every other window here has — a frame, a stone lintel over it (::before), and a
+   stone sill under it. The sill is a real `platform` in the level data, not paint: he lands on it and
+   steps in, so it is drawn by .ledge like any other footing, and this element only has to sit on it.
+   What this element adds to the sill is light (::after), which is what ties the two together.
+
+   Same opening language as .sash-window, deliberately: the checkpoint is a window he climbs OUT of,
+   this is one he climbs INTO, and they differ only in which way the colour runs — cyan for the
+   checkpoint, warm for the goal. */
 .goal-window {
     position: absolute;
     background:
-        /* The sash, pushed up, with the dark gap under it he squeezes through */
-        linear-gradient(rgba(28, 26, 32, 0.9) 0 20%, transparent 20% 34%,
-                        rgba(255, 206, 130, 0.28) 34% 100%),
-        linear-gradient(#3a2d1c 0%, #241b12 100%);
+        /* Glazing bar down the upper sash */
+        linear-gradient(90deg, transparent calc(50% - 1.5px), #3b3026 calc(50% - 1.5px) calc(50% + 1.5px),
+                        transparent calc(50% + 1.5px)) no-repeat top / 100% 42%,
+        /* The upper sash: glass with the room's light behind it, a sky reflection across one corner */
+        linear-gradient(155deg, rgba(255, 236, 200, 0.22) 0 30%, rgba(46, 30, 18, 0.62) 30%)
+            no-repeat top / 100% 42%,
+        /* The lower sash, shoved up behind it — only its meeting rail shows */
+        linear-gradient(transparent 0 42%, #4f4130 42% 48%, rgba(0, 0, 0, 0.35) 48% 50%, transparent 50%),
+        /* The open gap under it: the room, brightest low down where the lamp is. This is the part
+           that has to be visible from the ledges above, so it is the brightest thing on screen. */
+        radial-gradient(ellipse 85% 70% at 50% 80%,
+            #ffd9a0 0%, #f2a85a 45%, #a4602a 85%, #6e3c1c 100%);
     border: 3px solid #4a4038;
-    border-radius: 2px;
     box-sizing: border-box;
-    box-shadow:
-        inset 0 0 18px rgba(255, 186, 90, 0.45),
-        0 0 22px rgba(255, 176, 70, 0.30);
     z-index: 5; /* Behind Bumbot, like the vent pipe — he goes *into* it */
     animation: goalWindowGlow 3.4s ease-in-out infinite;
 }
+/* Stone lintel, the same as every other window's, slightly wider for the bigger opening */
+.goal-window::before {
+    content: '';
+    position: absolute;
+    left: -6px;
+    right: -6px;
+    top: -10px;
+    height: 8px;
+    background: linear-gradient(#6f6657 0 3px, #4d453b 3px 100%);
+    box-shadow: 0 2px 3px rgba(0, 0, 0, 0.55);
+}
+/* Lamplight falling out of the opening onto the sill. The sill is a plain ledge — the same slab as
+   every other one in the level — and this pool on its lit top edge is what makes it read as THIS
+   window's sill, the one step that is warm. Starts at the window's outer bottom edge, which is the
+   slab's top (top: 100% is the padding box, so the 3px border is added back). Spreads a little to the
+   right, out towards the gap, because that is the side he lands from. Paint only: z-index 5 puts it
+   over the slab (2) and under him (10). */
+.goal-window::after {
+    content: '';
+    position: absolute;
+    left: -12px;
+    right: -34px;
+    top: calc(100% + 3px);
+    height: 9px;
+    background: radial-gradient(ellipse 50% 100% at 42% 0%,
+        rgba(255, 200, 120, 0.60), rgba(255, 170, 80, 0.22) 55%, transparent 80%);
+    pointer-events: none;
+}
 @keyframes goalWindowGlow {
-    0%, 100% { box-shadow: inset 0 0 18px rgba(255, 186, 90, 0.40), 0 0 20px rgba(255, 176, 70, 0.26); }
-    50% { box-shadow: inset 0 0 22px rgba(255, 186, 90, 0.55), 0 0 30px rgba(255, 176, 70, 0.40); }
+    0%, 100% { box-shadow: inset 0 0 14px rgba(70, 30, 0, 0.55), 0 0 26px rgba(255, 176, 70, 0.34); }
+    50% { box-shadow: inset 0 0 14px rgba(70, 30, 0, 0.55), 0 0 40px rgba(255, 176, 70, 0.52); }
 }
 
 /* --- A window in the facade. Pure masonry detail on its own (the `window` entity), and ALSO the
@@ -2058,11 +2087,14 @@ button.secondary:hover { background: #1b1e2c; color: #aab3c4; }
 
 /* Getting in: the exact reverse of catEmerge, because every entrance and exit in this game is
    Bumbot squeezing through a gap that looks too small for him. On #catContainer, so it never has
-   to re-state scaleX(var(--face)). */
+   to re-state scaleX(var(--face)) — but, exactly as catEmerge's note explains, that also means the
+   sideways slide does NOT mirror for free. It is written as var(--face) times a fixed offset, negated
+   because --face -1 is facing right: he carries on in whichever direction he was walking. It used to
+   be a bare rightward 19px, and startWindowEntry() forced him to face right to match. */
 @keyframes catEnter {
     0% { transform: translateX(0) scale(1); opacity: 1; }
-    30% { transform: translateX(4px) scale(0.94, 1.04); opacity: 1; }
-    70% { transform: translateX(12px) scale(0.66); opacity: 1; }
-    100% { transform: translateX(19px) scale(0.42); opacity: 0; }
+    30% { transform: translateX(calc(var(--face, -1) * -4px)) scale(0.94, 1.04); opacity: 1; }
+    70% { transform: translateX(calc(var(--face, -1) * -12px)) scale(0.66); opacity: 1; }
+    100% { transform: translateX(calc(var(--face, -1) * -19px)) scale(0.42); opacity: 0; }
 }
 .cat-enter { animation: catEnter 1s cubic-bezier(0.4, 0, 0.7, 1) forwards; }

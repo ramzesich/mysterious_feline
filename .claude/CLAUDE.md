@@ -12,9 +12,9 @@ Two levels, and they do not share a shape:
   rooftops with a checkpoint vent pipe at the midpoint. New scenery here must be *rooftop* — if a
   thing wouldn't plausibly be bolted to the top of a building, it doesn't belong up there.
 - **Level 2, `the-long-way-down`** — a 400×620 portrait you fall down: 4200px of masonry between
-  two buildings, zig-zagging balcony to gargoyle to bare ledge, from the roof to a half-open second-floor
-  window, with the street lethal at the bottom. Scenery here is old stonework seen from *outside* a
-  building.
+  two buildings, zig-zagging balcony to gargoyle to bare ledge, from the roof to a lit second-floor
+  window with a sill to land on. The shaft has no floor: miss the sill and he falls out of sight.
+  Scenery here is old stonework seen from *outside* a building.
 
 ## Running it
 
@@ -26,7 +26,9 @@ script tags.
 
 `index.html?level=2` boots straight into that level, skipping the title card; add `#fast` to arm
 the catnip rush with it. 1-based, and an out-of-range value falls back to the menu rather than
-being clamped.
+being clamped. macOS `open` **drops the query string** from a `file://` URL, so `open
+"…/index.html?level=2"` silently boots level 1; hand the URL to the browser directly instead
+(`osascript -e 'tell application "Google Chrome" to open location "file:///…/index.html?level=2"'`).
 
 Verify changes by actually playing. Level 1: press Start, climb out of the spawn pipe, move right,
 jump onto a catwalk, touch razor wire (fur up, bail off screen, respawn out of a pipe), fall into an
@@ -34,9 +36,11 @@ alley, ride a gondola, walk into a strutting pigeon, get hit by a crow, pass the
 then die (should respawn there), press `M` (ripple + installations shatter), reach the feeder and
 watch the munch sequence. Level 2: check the frame actually resizes to portrait, watch him walk in from
 off screen and stop on the roof with both rooftops and the sky above them in shot, drop from ledge to
-ledge down both walls, get swatted by the old woman with the broom, fall down the middle slot to the
-street (should die), pass the checkpoint window then die (should respawn there — walking in again if you
-died before it), and reach the goal window (should shrink into it).
+ledge down both walls, get swatted by the old woman with the broom, pass the checkpoint window then die
+(should respawn there — walking in again if you died before it), check the camera stops scrolling once
+he is on the last balcony with the goal window and its sill in shot, drop off it straight down the
+middle (should fall out of the bottom of the frame and die — there is no street), then land on the sill
+short of the opening (nothing happens until he walks into it) and step in (should shrink into it).
 
 ## Files
 
@@ -61,7 +65,7 @@ array.
 
 Each level declares its own `frame` (the game window is resized per level) and `axis`. `map.js`'s
 header documents the full schema, including the extra fields a vertical level needs
-(`worldHeight`, `spawnY`, `lethalFloor`, `goal`).
+(`worldHeight`, `spawnY`, `goal`), plus `bottomless`, which either axis may use.
 
 Each level file's header records **its own** design budget, and the two do not generalise to each
 other — level 1's ~310px vertical ceiling and 200px max alley say nothing about level 2, whose
@@ -105,21 +109,24 @@ the goal is the warm one. Keep that split — it is the only warm light below le
 is what makes the way out readable from a long way up.
 
 
-Everything that branches on `level.axis` lives in **six** places, and it is worth keeping it that
-way. If a seventh appears, that's the signal to split the engine per axis rather than keep threading
+Everything that branches on `level.axis` lives in **five** places, and it is worth keeping it that
+way. If a sixth appears, that's the signal to split the engine per axis rather than keep threading
 `isVertical` through it:
 
 | Where | Horizontal | Vertical |
 |---|---|---|
 | `applyLevelGeometry()` | `#world` at `top: 0`, `height: 100%` | `#world` taller than the frame and anchored by its **bottom**, so `bottom: 40 + y` still lands right; `#goalFeeder` hidden |
 | `applyCamera()` | `left` only | also `bottom`, via `cameraForY()` |
-| `buildTerrain()` | `buildGround()` — a segment per stretch between pits, plus a void per gap | one lethal `.street` segment across the full width |
-| `hasReachedGoal()` | `catX >= winX` | overlaps `level.goal` |
+| `hasReachedGoal()` | `catX >= winX` | **standing** while overlapping `level.goal` |
 | `hasPassedCheckpoint()` | crossed its `x` | descended to its `y` (one-way, which only a one-way level can assume) |
 | `checkpointRespawn()` | clear of the pipe mouth | on the ledge outside the window |
 
+`buildTerrain()` used to be a sixth (vertical meant "draw a lethal street"). It now keys off
+`level.bottomless` instead, which is how it got off this list.
+
 Two things are driven by a **data flag** rather than the axis, deliberately, so a horizontal level
-could use them too: `level.lethalFloor` (touching `y = 0` kills) and `level.goal`.
+could use them too: `level.bottomless` (no floor at `y = 0` — nothing drawn, and falling past it kills
+even while dashing) and `level.goal`.
 
 `isVertical` is recomputed in `applyLevelGeometry()`, so it is always in sync with `level`. It governs
 *behaviour only* — see "Themes vs axis" above for why no stylesheet rule may key off it.
@@ -345,11 +352,21 @@ record (`{...obj, dom, active}`); `level.birds` become `BirdEntities`.
   other hazard she runs her own **state machine** (`updateSweepers()`, called from `stepPhysics`
   right after the birds): `idle` → (proximity) `telegraph` → `swing` (the only lethal state,
   checked in `handleOverlapSystems()` against a reach rectangle extending `sweeperReach` out from
-  her wall) → `cooldown` → back to `idle`. Immune to Sonic Meow on purpose, same as pits and
-  movers — the meow sweep only ever tests `pillar`/`spike`, and a person is not a thing to blast
-  away with a sound wave. Tier 1 catnip contact does **not** delete her the way `shatterEntity`
-  deletes a pillar; it just forces her to `cooldown` early (a flinch, not a kill) — see Catnip
-  below for why every new hazard has to opt into that check by hand.
+  her wall) → `cooldown` → back to `idle`. Sonic Meow shatters her like any other enemy, but **only
+  while her window is open** — `telegraph` or `swing`. Idle, or back in `cooldown` with the sash shut,
+  she is just a window, and a meow that broke one would expose her from a screen away and spend the
+  ambush before it happened. Tier 1 catnip, too, treats her like every other hazard: if the broom
+  connects while he is on catnip, she shatters and is gone for the rest of the run (`active = false`
+  takes her out of `updateSweepers()` too).
+
+  Either way **only she breaks — the window stays.** `shatterEntity()` hands a sweeper to
+  `shatterSweeper()`, which bursts and shrinks `.sweeper-rig` alone, then removes the mask and clears
+  `.active`/`.swinging` so the sash swings shut and the light goes off. Shattering the whole element
+  left a window-shaped hole in the wall. The sash waits the 400ms out on purpose: it sits in front of
+  the figure, so closing it at once would hide her break. Only the swing
+  counts as contact — idle she is a window and the telegraph is still look-don't-touch. She used to
+  merely flinch back into `cooldown`, which made her the one enemy catnip could not get rid of. See
+  Catnip below for why every new hazard has to opt into that check by hand.
 
   **Placing one is where she goes wrong**, and both failures are silent — she runs her whole
   animation and simply never connects. Her lethal rectangle is her window's own box grown out by
@@ -397,6 +414,14 @@ keys on `.level-entity` instead of type classes. A vertical level's is a `.goal-
 `generateLevel()` **does** generate from `level.goal` — and `applyLevelGeometry()` hides
 `#goalFeeder` outright, since a feeder makes no sense partway down a wall.
 
+The goal window needs **footing of its own**: `hasReachedGoal()` only fires while he is grounded, so
+level 2 puts a plain stone `platform` (the sill) with its slab top exactly at `goal.y`, wider than the
+window so he can land short and walk the last step in. Without the grounded test the win fired the
+moment a falling box clipped the top of the window, then `startWindowEntry()` snapped him down — a
+visible teleport. The sill is an ordinary ledge on purpose; what marks it out is
+`.goal-window::after`, a pool of lamplight painted onto its top edge. Because he is already standing
+there, `startWindowEntry()` does not move him or turn him at all — see Winning below.
+
 `isSolidType()` / `isSlabType()` decide collision behavior — extend those rather than adding
 type checks inline. Removal pattern: set `active = false`, animate, then `setTimeout(remove)`.
 
@@ -421,7 +446,8 @@ with.
 
 ## Ground, pits and falling
 
-The floor is chosen by `buildTerrain()`, and the two levels want opposite things from it.
+The floor is chosen by `buildTerrain()`, from data rather than the axis, and the two levels want
+opposite things from it.
 
 **Horizontal.** The ground is **not** a single div. `buildGround()` emits a `.ground-segment` for
 each stretch between the level's `pits`, plus a `.pit` void div per gap. `isOverSolidGround(x)`
@@ -440,17 +466,27 @@ Consequences worth knowing: the ground clamp at `catY <= 0` is now conditional, 
 frame. A pit is the one hazard a meow cannot remove — that's deliberate, and it's what keeps
 the no-snack route honest.
 
-**Vertical.** One `.ground-segment.street` across the full width, and `level.lethalFloor` makes
-touching it fatal on contact — the whole failure state moves to the bottom of the shaft, because
-falling is the *route* here rather than the mistake. The flag also forces the standing branch to
-drop him, so he can never come to rest on the street. `.street` suppresses the parapet
-pseudo-elements: a coping stone is the cue that a gap is the space between two roofs, and down here
-the gap is the entire level.
+**Bottomless (level 2).** `level.bottomless` means there is no floor: `buildTerrain()` draws
+nothing, the `catY <= 0` clamp never lands him, and the standing branch drops him if he is somehow
+at 0. In a vertical level the off-screen rule (`catY < cameraViewY - offScreenDeathDrop`) gets him
+first; `fallDeathY` is the backstop that would cover a horizontal one. Either way it plays as the
+`'pit'` death — he simply falls out of sight, exactly as into a level 1 alley.
 
-The dash does not save him from a lethal floor — there is nothing below the street to drop through.
+It replaced a lethal `.street` segment (`lethalFloor`). That was a floor drawn only so it could kill
+on contact, and it made the bottom of the shaft read as a room with a deadly carpet rather than as a
+drop. Two consequences of losing it:
+
+- The walls now start at the very bottom of `#world` (`y = -40`, the lowest line the camera ever
+  shows) rather than standing on the street, or the frame would end in a strip of sky.
+- The camera's bottom clamp — the bottom of the world — is now the thing that frames the end of the
+  level. It is already pinned there once he stands on the last balcony, so the goal window and its
+  sill are in shot with ~140px of bare wall below them, and that wall is the drop.
+
+The dash does not bridge a bottomless level: a 4× run across a level 1 alley still has a far roof to
+land on, and here there is no far side.
 
 Level 2 has no `pits` at all (`pits: []`). The clear 120px slot down the middle of the shaft is not
-a barrier and doesn't need to be: hugging it means a 4000px fall to the street, so the shortcut
+a barrier and doesn't need to be: hugging it is a fall straight out of the frame, so the shortcut
 punishes itself.
 
 ## Birds
@@ -560,15 +596,15 @@ Two reset paths, deliberately different:
 - `triggerHurtReset(cause)` (death) — returns to `respawnX` / `respawnY` (the checkpoint if passed,
   else the level's own spawn), keeping score and level state. A death **never** costs you more than
   the current level. Both axes are tracked because level 2's checkpoint is a window partway *down*:
-  respawning at `y = 0` there would drop him on the lethal street. It has **two presentations**, and
+  respawning at `y = 0` there would drop him into the bottomless shaft. It has **two presentations**, and
   neither flashes the screen or shakes him — the read is entirely on the sprite, which is the payoff
   of rigging him:
   - contact with wire or a bird: `.cat-spooked` on `#cat` reveals `bbFur` (spikes along his back),
     puffs the tail and pins the ears, then 200ms later `.cat-bail` on the container hops him up
     and drops him off the bottom of the screen. 800ms total.
   - `cause === 'pit'`: no fright and no hop, because he is already falling — `.cat-plunge` just
-    carries him the rest of the way down. 520ms total. A `lethalFloor` death uses this too, since
-    hitting the street is the same story.
+    carries him the rest of the way down. 520ms total. Falling out of the bottom of a vertical level's
+    frame uses this too, since it is the same story.
 
   Both are clipped by `#gameWindow`'s `overflow: hidden`, which is all "off screen" needs to mean.
   The respawn hand-draws `left`/`bottom` **and calls `applyCamera()`** before `playPipeEmerge()`,
@@ -627,9 +663,12 @@ overlay copy and the fanfare.
 - **`startVictoryMunch()`** (horizontal) — snaps him beside the bowl (38px back, or his 50px box
   hides the thing the sequence is about), runs the `.munching` chew loop with crunch tones, empties
   the bowl via `.eaten`, waits `munchDuration`.
-- **`startWindowEntry()`** (vertical) — snaps him to the window mouth and runs `.cat-enter`, which
-  is deliberately the exact reverse of `catEmerge`: every entrance and exit in this game is Bumbot
-  squeezing through a gap too small for him. Waits `windowEntryDuration`.
+- **`startWindowEntry()`** (vertical) — runs `.cat-enter` from **exactly where he stands and the way
+  he faces**, which is deliberately the exact reverse of `catEmerge`: every entrance and exit in this
+  game is Bumbot squeezing through a gap too small for him. No snap — it used to place him at a fixed
+  spot facing right, which made him hop and turn round whenever he came at the window from the other
+  side. `catEnter`'s 19px slide is `var(--face)`-signed like `catEmerge`'s, so he carries on the way he
+  was walking. Waits `windowEntryDuration`.
 
 `.munching` and `.cat-enter` are both cleared in `loadLevel()` and `showStartMenu()`.
 
@@ -715,7 +754,8 @@ the loop and moves him has to hand-draw, exactly as the respawn and the victory 
 ## Sonic Meow
 
 `M` key. Costs one snack (`snacks`, which doubles as ammo; starts at 1). Destroys every
-pillar, spike, and bird currently on screen, spawning rubble bursts. Pits and movers are
+pillar, spike, and bird currently on screen, plus any sweeper whose window is open (leaning out or
+swinging — never one hiding behind a shut sash), spawning rubble bursts. Pits and movers are
 immune. Zero snacks plays a low reject tone instead.
 
 "On screen" is tested on **both axes** by the local `onScreen(x, y)` helper. An x-only test was
@@ -741,7 +781,7 @@ What tier 1 pointedly does **not** do — and this is the whole shape of the des
 
 - **Geometry stays solid.** Pillars, platforms and movers still block him. The pillar-shatter branch
   stays gated on `dashing`, because catnip alone can never reach the inside of a pillar to trigger it.
-- **Falling still kills.** Pits, `lethalFloor` and the vertical off-screen rule all ignore catnip.
+- **Falling still kills.** Pits, `bottomless` and the vertical off-screen rule all ignore catnip.
 
 So tier 1 makes him invincible to *things* without letting him ignore the level.
 
@@ -758,10 +798,11 @@ under you there is the ground — and fatal in level 2, where the ledges *are* t
 `Shift` dropped him through every one of them to his death. Don't reintroduce it.
 
 Pits are still treated as whole ground while dashing, so level 1's 4× run crosses the alleys. The
-checkpoint portal, snacks and the goal are all overlap-only, so they keep working at dash speed.
+checkpoint portal and snacks are overlap-only, so they keep working at dash speed; level 2's goal
+wants him standing, which still works because the dash lands on slabs and the sill is one.
 
-Note the one thing a `lethalFloor` does not yield to even here: there is nothing below the street to
-drop through, so the dash does not save him from it.
+Note the one thing a `bottomless` level does not yield to even here: there is no far side to run
+across to, so the dash does not save him from it.
 
 Residual worth knowing: at 4× a walk-off carries him ~4× as far sideways, so in level 2 he pins
 against the far wall and lands on whichever ledges are on *that* wall, skipping the ones opposite.

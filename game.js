@@ -46,7 +46,7 @@ let velocityY = 0;
 let isGrounded = true;
 let groundedOn = null; // The entity Bumbot is standing on, so movers can carry him
 // Where a death sends him back to. Both axes are tracked because a vertical level's checkpoint is
-// a window partway *down* — respawning at y=0 there would drop him on the lethal street.
+// a window partway *down* — respawning at y=0 there would drop him into the bottomless shaft.
 let respawnX = level.spawnX;
 let respawnY = level.spawnY || 0;
 // Which way he should face on arrival there. -1 is level 1's convention (out of the pipe, facing
@@ -428,43 +428,46 @@ function buildGround() {
     addGroundSegment(cursor, worldWidth - cursor);
 }
 
-function addGroundSegment(left, width, extraClass) {
+function addGroundSegment(left, width) {
     if (width <= 0) return;
     const segment = document.createElement('div');
     segment.classList.add('ground-segment', 'level-entity');
-    // A vertical level's floor is the street, not a roof: same box, different material and no
-    // parapets, and touching it is fatal rather than safe.
-    if (extraClass) segment.classList.add(extraClass);
     segment.style.left = left + 'px';
     segment.style.width = width + 'px';
     world.appendChild(segment);
 }
 
-// --- Everything that genuinely depends on level.axis lives in one of these four functions, plus
-// --- applyLevelGeometry and applyCamera. Six branch points in total; keep it that way. If a
-// --- seventh appears, that is the signal to split the engine per axis rather than keep threading
-// --- `isVertical` through it. See "Axis-dependent behaviour" in CLAUDE.md.
+// --- Everything that genuinely depends on level.axis lives in the three functions after this one,
+// --- plus applyLevelGeometry and applyCamera. Five branch points in total; keep it
+// --- that way. If a sixth appears, that is the signal to split the engine per axis rather than keep
+// --- threading `isVertical` through it. See "Axis-dependent behaviour" in CLAUDE.md.
 
-// The floor. A horizontal level's is the roofline: one segment per stretch between its pits, with
-// a void div per gap. A vertical level's is the street at the bottom of the shaft — one segment
-// across the full width, lethal to touch, there to be looked down at rather than walked on.
+// The floor: one segment per stretch between the level's pits, with a void div per gap — unless the
+// level is `bottomless`, in which case there is nothing at y=0 to stand on and so nothing to draw.
+// Driven by that flag rather than by the axis, which is what it used to be: level 2 had a lethal
+// street down there instead, and a floor that only exists to kill you is better drawn as no floor at
+// all — the shaft simply carries on below the frame, and missing the last sill drops him out of
+// sight exactly like an alley does in level 1.
 function buildTerrain() {
-    if (isVertical) {
-        addGroundSegment(0, worldWidth, 'street');
-        return;
-    }
+    if (level.bottomless) return;
     buildGround();
 }
 
 // Has the level been completed? Horizontal levels win at a line measured back from the right-hand
-// edge; vertical levels win by overlapping the `goal` rect, because "the far right-hand edge"
-// means nothing when the level runs downward.
+// edge; vertical levels win by standing in front of the `goal` window, because "the far right-hand
+// edge" means nothing when the level runs downward.
+//
+// Standing, not merely overlapping — the same rule hasPassedCheckpoint uses, for a related reason.
+// The window has a real sill under it now, and he lands on that and steps in. Overlap alone fired the
+// moment his falling box clipped the top of the window, then snapped him down onto the sill, which
+// read as being teleported through the last few feet of the level.
 function hasReachedGoal() {
     if (!isVertical) return catX >= winX;
 
     const g = level.goal;
     if (!g) return false;
-    return catX < g.x + g.width && catX + 35 > g.x &&
+    return isGrounded &&
+           catX < g.x + g.width && catX + 35 > g.x &&
            catY < g.y + g.height && catY + 45 > g.y;
 }
 
@@ -502,8 +505,11 @@ function buildWalls() {
         const el = document.createElement('div');
         el.classList.add('facade-wall', 'facade-wall-' + w.side, 'level-entity');
         el.style.width = w.width + 'px';
-        el.style.height = w.top + 'px'; // Runs from the street up to the building's top
-        el.style.bottom = '40px';       // The usual 40 + y convention, with y = 0
+        // Runs from the very bottom of #world — y = -40, the lowest line the camera ever shows — up
+        // to the building's top. There is no street to stand it on any more, so it has to fill the
+        // bottom of the frame itself or the shaft would end in a strip of empty sky.
+        el.style.height = (40 + w.top) + 'px';
+        el.style.bottom = '0px';
         if (w.side === 'left') el.style.left = '0px';
         else el.style.right = '0px';
         world.appendChild(el);
@@ -764,6 +770,7 @@ function createShatterBurst(originX, originY, obstacleHeight) {
 // identical however it was smashed.
 function shatterEntity(ent) {
     if (!ent.active) return;
+    if (ent.type === 'sweeper') return shatterSweeper(ent);
     ent.active = false;
 
     createShatterBurst(ent.x, ent.y || 0, ent.height || 40);
@@ -777,6 +784,38 @@ function shatterEntity(ent) {
     ent.dom.style.opacity = "0";
 
     setTimeout(() => ent.dom.remove(), 400);
+    playAudioTone(120, 'sawtooth', 0.2);
+}
+
+// A sweeper breaks differently, because only HALF of her is the hazard. The old woman shatters; her
+// window is part of the building and stays. Shattering the whole element, as shatterEntity does to a
+// pillar, left a window-shaped hole in the masonry — the wall itself looked destroyed.
+//
+// So the burst and the crack lines go on her figure (.sweeper-rig) alone, shrinking towards her feet
+// at the sill, and only once she is gone does the window go back to being a window: the sash swings
+// shut and the light goes off. Doing that straight away would swing the pane in front of her mid-break
+// (it sits above the figure, as the glass she leans past) and hide the very thing being shown.
+// `active = false` retires her from updateSweepers() and from every overlap and meow test, so what is
+// left is indistinguishable from the decorative windows down the facade for the rest of the run.
+function shatterSweeper(ent) {
+    ent.active = false;
+
+    createShatterBurst(ent.x + 5, ent.y + 8, sweeperHeight - 16);
+
+    const rig = ent.dom.querySelector('.sweeper-rig');
+    const crackLayer = document.createElement('div');
+    crackLayer.classList.add('cracked');
+    rig.appendChild(crackLayer);
+
+    // Inline, so it overrides the class-driven translateY; the 4px keeps her where .active had her
+    rig.style.transition = "transform 0.4s cubic-bezier(0.36, 0.07, 0.19, 0.97), opacity 0.4s ease-out";
+    rig.style.transform = "translateY(4px) scale(0) rotate(" + (Math.random() * 30 - 15) + "deg)";
+    rig.style.opacity = "0";
+
+    setTimeout(() => {
+        ent.dom.querySelector('.sweeper-mask').remove();
+        ent.dom.classList.remove('active', 'swinging');
+    }, 400);
     playAudioTone(120, 'sawtooth', 0.2);
 }
 
@@ -922,10 +961,16 @@ function triggerSonicMeow() {
                y >= viewBottomBound - 40 && y <= viewTopBound;
     }
 
-    // Core screen-clearing logic for pillars and spikes. Pits and movers are immune,
+    // Core screen-clearing logic for pillars, spikes and sweepers. Pits and movers are immune,
     // which is what keeps the level's route snack-free by design.
+    //
+    // A sweeper only while her window is OPEN — leaning out or mid-swing. Idle, or retreated into
+    // cooldown with the sash shut, she is a window like any other on the facade, and a meow that
+    // shattered one would give her away from a screen above, which is the whole ambush gone.
     RuntimeEntities.forEach(ent => {
-        if (!ent.active || (ent.type !== 'pillar' && ent.type !== 'spike')) return;
+        if (!ent.active) return;
+        const exposed = ent.type === 'sweeper' && (ent.state === 'telegraph' || ent.state === 'swing');
+        if (ent.type !== 'pillar' && ent.type !== 'spike' && !exposed) return;
         if (onScreen(ent.x, ent.y || 0)) shatterEntity(ent);
     });
 
@@ -1113,23 +1158,19 @@ function handleOverlapSystems() {
 
         // Only lethal mid-swing — the window and the telegraph lean are both look-don't-touch.
         // Reach extends out from her own wall into the gap, opting into tier 1 catnip exactly like
-        // a spike so she doesn't silently become an unblockable hazard once the stash is found.
+        // a spike: the broom connects, and on catnip it is her that loses — she shatters and is gone
+        // for the rest of the run, the same as any other hazard he touches. Her window stays (see
+        // shatterSweeper).
+        // It used to be a flinch back into cooldown instead, which left the one enemy in the game
+        // that catnip could not get rid of.
         if (obj.type === 'sweeper' && obj.state === 'swing') {
             const out = obj.side === 'left' ? obj.x + sweeperReach : obj.x - sweeperReach;
             const reachLeft = Math.min(obj.x, out);
             const reachRight = Math.max(obj.x + sweeperWidth, out);
             if (catX < reachRight && catX + catWidth > reachLeft &&
                 catY < obj.y + sweeperHeight && catY + catHeight > obj.y) {
-                if (smashesHazards) {
-                    // A flinch, not a kill: shattering her like a pillar would read as destroying
-                    // a person rather than dodging one. She just loses her nerve and retreats.
-                    obj.state = 'cooldown';
-                    obj.timer = sweeperCooldownFrames;
-                    obj.dom.classList.remove('active', 'swinging');
-                    playAudioTone(320, 'triangle', 0.1);
-                } else {
-                    triggerHurtReset();
-                }
+                if (smashesHazards) shatterEntity(obj);
+                else triggerHurtReset();
             }
         }
     });
@@ -1199,9 +1240,10 @@ function startVictoryMunch() {
 // and shrinks into it — the reverse of the pipe emerge he arrives by, which is the whole point:
 // every entrance and exit in this game is Bumbot squeezing through a gap too small for him.
 function startWindowEntry() {
-    const g = level.goal;
-    catX = g.x + 8;
-    catY = g.y;
+    // He goes in from exactly where he stands, facing the way he was walking. hasReachedGoal() only
+    // fires once he is grounded on the sill, so there is no fall left to tidy up — and snapping him to
+    // a set spot facing right, as this used to, made him jump sideways and turn round whenever he came
+    // at the window from the other side. catEnter carries him the last 19px in the direction he faces.
     velocityY = 0;
     isGrounded = true;
     groundedOn = null;
@@ -1209,7 +1251,6 @@ function startWindowEntry() {
     // The loop has stopped, so this final frame is drawn by hand — same reason as the munch above
     catContainer.style.left = catX + 'px';
     catContainer.style.bottom = (40 + catY) + 'px';
-    catContainer.style.setProperty('--face', -1);
     catContainer.classList.remove('cat-idle', 'cat-launch', 'cat-land', 'cat-emerge');
     cat.classList.remove('cat-run', 'cat-air', 'munching');
     void catContainer.offsetWidth; // Force the reflow, or a replay would not re-run the animation
@@ -1472,16 +1513,12 @@ function stepPhysics(dt) {
         }
 
         if (catY <= 0) {
-            // A lethal floor is the bottom of a vertical level: the street. It only really comes into
-            // play on the last few ledges, where the camera has hit its clamp and can no longer be
-            // fallen out of — above that, the off-screen rule above gets him first. A dash does not
-            // save him either, because there is nothing below the street to drop through.
-            if (level.lethalFloor) {
-                triggerHurtReset('pit');
-                return;
-            }
-            // Dashing treats every pit as if the ground were whole, so he runs straight over
-            if (isOverSolidGround(catX) || dashing) {
+            // A bottomless level is one pit the width of the world, and the dash does not bridge it:
+            // a 4x run crossing a level 1 alley still has the far roof to land on, and here there is
+            // no far side. In a vertical level the off-screen rule above has normally got him already;
+            // fallDeathY is the backstop for a horizontal one.
+            // Dashing treats every ordinary pit as if the ground were whole, so he runs straight over
+            if (!level.bottomless && (isOverSolidGround(catX) || dashing)) {
                 catY = 0; velocityY = 0; isGrounded = true; groundedOn = null;
             } else if (catY < fallDeathY) {
                 triggerHurtReset('pit'); // Fell into an alley: no fright, he just keeps going down
@@ -1498,8 +1535,8 @@ function stepPhysics(dt) {
                 isGrounded = false; velocityY = 0; groundedOn = null;
                 wasInAirBefore = true;
             }
-        } else if (!isOverSolidGround(catX) || level.lethalFloor) {
-            // Walked off the lip of a pit — or is standing on a floor that was never safe
+        } else if (!isOverSolidGround(catX) || level.bottomless) {
+            // Walked off the lip of a pit — or is standing on a floor that was never there
             isGrounded = false; velocityY = 0; groundedOn = null;
             wasInAirBefore = true;
         }
