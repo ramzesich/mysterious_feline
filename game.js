@@ -1262,7 +1262,7 @@ function startWindowEntry() {
     setTimeout(() => {
         // Also one line, matching level 1. This copy is invented rather than inherited, so it is
         // the first thing to change if it doesn't sound like Bumbot.
-        revealWinScreen("Bumbot squeezed inside, off the street and out of the cold.");
+        revealWinScreen("Bumbot safely made it home.");
     }, windowEntryDuration);
 }
 

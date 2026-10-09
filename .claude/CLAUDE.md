@@ -536,8 +536,38 @@ the wing geometry is ever changed.
 The pigeon sprite's ink spans roughly `y+3` to `y+33` against a hitbox of `y+8`..`y+32`, so its
 legs stick out below the lethal band. That is deliberate and forgiving; the hitbox was not touched.
 
-Placement rules live in `map.js`'s header: a walker's patrol range stays inside one roof, speed
-≤ 2, and never on the landing side of an alley.
+Placement rules are per level and live in each level file, not in `map.js`. Level 1's (its header): a
+walker's patrol range stays inside one roof, speed ≤ 2, and never on the landing side of an alley.
+
+Level 2's (the comment above its `birds`) cannot reuse that last rule, because every ledge *is* a
+landing side. Instead every bird must be readable from the ledge above and beaten by waiting:
+
+- **Corridor crows** cross the drop between two ledges, with their hitbox kept off both standing
+  bands, so they threaten only the fall. Their x range must cover where he actually is when he
+  passes their height — a walk-off is still near the wall it left at mid-height, so a crow centred
+  in the gap meets almost nothing. They sit flush under the lip he steps off, and run long (230–260px),
+  limited only by the frame edge and the stone hanging under the ledge above.
+- **The skimmer** (over the 625 balcony) does hit a standing cat. It clears the railing by a few px,
+  which a tapped jump does not but a held one does.
+- **Windowsill pigeons** patrol the wall end of gargoyle ledges with a window above. That is never a
+  balcony (they would walk through the iron, and z-index would put them in front of it), never the
+  checkpoint ledge, never near the sweeper. The outer lip he leaves by stays clear; the threat is the
+  landing.
+- **The opening two** walk the **top rail** of the first balcony's railing and the bare ledge at
+  3755. Walking *on* the iron is the one case where a bird on a balcony is right: z-index 12 in front
+  of the railing is then correct rather than a bug. The rail walker sits at 3983 rather than 3986
+  because the pigeon sprite's feet are ~3px above its box bottom, which hovers visibly on a thin rail.
+  The 3755 walker patrols the **whole** ledge, slowly: he lands against its wall and leaves by its
+  lip, so a half-ledge patrol would always sit on one or the other. Never the starting roof (the
+  walk-in locks input). A pigeon on the opposite roof was tried and dropped — a bird he can only reach
+  by a pointless jump made no sense.
+- **Perched pigeons** (three) are placed against the line rather than timed: clear of the default
+  landing, punishing an overshoot, or — on the gargoyle at 375 — standing between him and the lip as
+  the one bird he must jump. A perched bird is static and visible, so unlike a moving one it may sit a
+  screen from the sweeper.
+
+Everything in level 2 moves slower than level 1 (crows 1.5–2.0, walkers ≤ 1.2): he meets birds on
+landing or waits on them at a lip, with less room to react than on a run-up across a roof.
 
 ## Movers and carrying
 

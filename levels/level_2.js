@@ -336,12 +336,125 @@ const LEVEL_2 = {
     // than here — she's proximity-triggered rather than patrolling, so she's built like the
     // portal/platform furniture instead of a bird).
     //
-    // The pigeon sits on the third ledge — the tail end of the deliberately gentle intro run —
-    // parked at the far right of a 170px balcony (flush right wall, so x=350 is 50px from the
-    // edge). A plain walk-off from the sill above lands around x=269 holding right the whole way,
-    // so the default line touches down well clear of it; only drifting further right finds it.
-    // First hazard in the level, so it gets the widest possible margin for error.
+    // The first perched pigeon sits on the third ledge — the tail end of the deliberately gentle intro
+    // run — on the gargoyle ledge at 3620 (230-400), under that ledge's window. It used to be parked
+    // hard against the wall at x=350, which read as tucked away rather than as sat on the sill; x=310
+    // puts it in the window's bay. It cannot go to the true middle (~295): a plain walk-off from the
+    // ledge above lands around x=269 holding right the whole way (box 269-304), and at 310 the hitbox
+    // starts at 316, so the default line still touches down ~12px clear. Drifting further right, or
+    // jumping, finds it. First hazard in the level, so it keeps a margin for error.
+    //
+    // BIRD BUDGET. Level 1's rule — never patrol the landing side of a gap — cannot hold here, because
+    // every ledge IS the landing side of one. The replacement rule is that every bird must be readable
+    // from the ledge above before he commits, and beaten by waiting for it rather than by luck:
+    //   * Bird hitbox is x+6..x+34, y+8..y+32 against his 35x45, for both species.
+    //   * A CORRIDOR crow crosses the drop between two ledges on opposite walls (tops TA above, TB
+    //     below). Its y must keep the hitbox off both standing bands — TB+37 < y < TA-37 — so it can
+    //     never touch him while he stands on either and only threatens the fall. It is in frame from
+    //     TA (the frame's bottom edge is TA-329), so the answer is to wait at the lip until it is
+    //     on the far side or heading away. Before adding one, check no OTHER ledge top falls inside
+    //     y-37..y+32 under its x range, or it quietly becomes a crow that hits a standing cat.
+    //   * A SKIMMING crow does hit a standing cat, on purpose — it is the one beaten by jumping. It
+    //     clears the 26px railing by a few px so it reads as flying over the iron rather than through
+    //     it, which puts its hitbox ~50px up: a tapped jump (~35px) does NOT clear it, a held one does.
+    //   * Pigeons walk "windowsills": gargoyle ledges with a window above, never a balcony (they would
+    //     walk through the railing, and z-index puts a bird in front of iron he stands behind) and
+    //     never the checkpoint ledge (he respawns there) or the sweeper's. Each patrols the WALL end, so
+    //     the outer lip he leaves by is always clear: the threat is the landing, where the patrol
+    //     overlaps the default walk-off line, and the fix is to drop while it is walking away. Speed
+    //     <= 1.2 — under level 1's ceiling, because here he meets them on landing with less room to
+    //     react than on a run-up across a roof.
+    //   * PERCHED pigeons stand still, so they are placed against the line rather than timed: clear of
+    //     the default landing, threatening an overshoot or standing between him and the lip as
+    //     something to jump. A tapped jump clears one by only ~3px (35px apex against a hitbox top
+    //     32px up); a held jump clears it easily.
+    //   * No MOVING bird within a screen of the sweeper (ledges 1785 to 1380): one ambush at a time.
+    //     A perched pigeon is not an ambush — it is visible and static — so 1785 carries one.
+    //   * Crows fly at 1.5-2.0, slower than level 1's 2-3. A corridor crow is something he waits on
+    //     at a lip, and at level 1 speeds the safe window to step off was too short to read.
     birds: [
-        { x: 350, y: 3620, axis: 'walk', min: 350, max: 350, speed: 0, facing: 'left' }
+        { x: 310, y: 3620, axis: 'walk', min: 310, max: 310, speed: 0, facing: 'left' },
+
+        // Perched on the bare ledge at 1785 (250-400), at the wall end and facing the gap — the same
+        // arrangement the first one had. He arrives by hopping the balcony rail at 1915: a tap lands
+        // around x~327 (box to ~362), just clear of a hitbox starting at 364; a held jump pins him on
+        // the wall at 350, on top of it. Leaving is leftward, off the outer lip, so it never stands in
+        // the way — which matters here, because a jump off that lip would carry him past the pocket
+        // on the sweeper's ledge below and into her reach.
+        { x: 358, y: 1785, axis: 'walk', min: 358, max: 358, speed: 0, facing: 'left' },
+        // Perched mid-ledge on the gargoyle at 375 (0-150), facing the gap. The hop off the 625 balcony
+        // carries him to the wall end (x 0-35), so he lands behind it and has to JUMP it to reach the
+        // lip — the one pigeon in the level that is an obstacle on the route rather than beside it.
+        // A held jump from there clears it and carries on across the gap, landing on the last balcony
+        // (250-400, top 240) at x~340. Covers the bottom of the shaft, which otherwise had only the
+        // skimmer below 1025.
+        { x: 60,  y: 375,  axis: 'walk', min: 60,  max: 60,  speed: 0, facing: 'right' },
+
+        // Corridor crows, one per section, each a little faster than the last. Their ranges must COVER
+        // where he actually is when he falls through their height, not just the middle of the gap: a
+        // walk-off covers most of its sideways distance late in the fall, so a crow parked mid-gap at
+        // mid-height met almost nothing. Each range is then run long — 230-260px, wall to wall where the
+        // stonework allows — so the crow reads as working the whole shaft rather than pacing a box.
+        // Widening one is free only while its band stays empty: re-check that no ledge top falls in
+        // y-37..y+32 anywhere under the new range. The limits that are not the frame edge are the stone
+        // hanging under the ledge above — a gargoyle head or a corbel the crow would fly through.
+        // Balcony 3380 (left) -> awning 3205 (right): band 3242-3343. A tapped hop over the rail crosses
+        // this crow's height at x~261-331. Nothing hangs at this height on either wall.
+        { x: 220, y: 3290, axis: 'x', min: 70,  max: 330, speed: 1.6 },
+        // Gargoyle 2515 (right) -> bare 2280 (left): band 2317-2478. Flies just under the lip he steps
+        // off — a walk-off is still near the right-hand wall at this height (box x~69-157). Its box tops
+        // out at 2500, flush with the underside of the slab, so the wings never cross the stone; max 290
+        // stops it short of the gargoyle head under that slab (x 334-400). A 235px drop with ~115px of
+        // reach to spare, so it is the stretch that can afford a hazard.
+        { x: 160, y: 2460, axis: 'x', min: 30,  max: 290, speed: 1.8 },
+        // Checkpoint ledge 2115 (right) -> balcony 1915 (left): band 1952-2078. Same flush-under-the-lip
+        // placement (walk-off crosses it at box x~89-177); max 290 stops it short of the corbel under the
+        // checkpoint ledge's wall end. The first thing he sees on every respawn, and it cannot reach the
+        // ledge he emerges onto — its hitbox tops out at 2092, under the 2115 deck.
+        { x: 150, y: 2060, axis: 'x', min: 30,  max: 290, speed: 2.0 },
+
+        // The skimmer: just over the railing of the wide balcony at 625, the second-last proper ledge.
+        // He lands into its patrol and has to jump the gap-end rail to leave, so it is met either way —
+        // and the held jump that clears the rail clears the crow too. It now runs out over the gap as
+        // well as along the balcony, which is the only ledge in its band. Slower than the corridor crows,
+        // because here it is standing in his way rather than crossing it.
+        { x: 260, y: 645, axis: 'x', min: 130, max: 355, speed: 1.5 },
+
+        // The opening screens, which had a single perched bird on them. Not on the roof he starts on: the
+        // walk-in locks his input, so a bird there could kill him before he has a key. (There was one on
+        // the OPPOSITE roof, as pure scenery; a pigeon he can only reach by a pointless jump made no sense
+        // and it is gone.)
+        // Along the TOP RAIL of the first balcony's railing (slab top 3960 + the 26px railing = 3986).
+        // Walking on the iron rather than behind it is what makes z-index 12 in front of the railing
+        // correct for once. y is 3983, not 3986, because the pigeon sprite's feet are drawn ~3px above
+        // the bottom of its box — invisible against a stone ledge's lit top, but on a 3px rail it left
+        // the bird visibly hovering. Its hitbox (3991-4015) is at his head height on the floor below it,
+        // so it is a real hazard to anyone standing under it — but it keeps to the wall end (hitbox
+        // 306-389), the roof walk-off lands at x~246-281, and he leaves over the OTHER end of the railing.
+        { x: 330, y: 3983, axis: 'walk', min: 300, max: 355, speed: 0.9 },
+        // The bare ledge at 3755 (0-140), straight below the roof he starts on. The awkward ledge for a
+        // walker: he arrives by hopping the balcony rail and lands against the WALL (a tap puts him at
+        // x~19-54, a held jump pins him at 0), and leaves by the lip at the far end. A patrol on either
+        // half alone would always sit on the landing or always block the exit, so this one walks the
+        // whole ledge, slowly, and both answers are timing:
+        //   * land against the wall while it walks away, then tap-jump over it as it comes back — a tap
+        //     clears it by ~3px and carries him off the lip onto the 3620 ledge at x~210-235;
+        //   * or ease off the arrow in the air, land out near the lip (x~100) while it is at the wall
+        //     end, and step straight off.
+        // The trap is a HELD jump from against the wall, which carries him ~315px and onto the perched
+        // pigeon at 3620. That is the level's second ledge, so the speed is the slowest in the level.
+        { x: 50,  y: 3755, axis: 'walk', min: 0,   max: 100, speed: 0.8 },
+
+        // Windowsill pigeons, on the three gargoyle ledges with a window over them.
+        // Gargoyle 3075 (left, 0-120). The walk-off from the awning lands at x~79; the hitbox reaches
+        // that far only at the outer end of its patrol, so the default line meets it there and nowhere
+        // else — the gentlest of the three, since it is the first walker he meets.
+        { x: 20,  y: 3075, axis: 'walk', min: 0,   max: 55,  speed: 1.0 },
+        // Gargoyle 2515 (right, 210-400). A tapped hop over the balcony rail at 2660 lands at x~323,
+        // inside a 276-389 patrol; a held jump pins him on the wall at 350, right in it.
+        { x: 300, y: 2515, axis: 'walk', min: 270, max: 355, speed: 1.1 },
+        // Gargoyle 1025 (right, 240-400). The tapped hop over the balcony rail at 1165 lands at x~281,
+        // just inside its 291-389 patrol.
+        { x: 320, y: 1025, axis: 'walk', min: 285, max: 355, speed: 1.2 }
     ]
 };
