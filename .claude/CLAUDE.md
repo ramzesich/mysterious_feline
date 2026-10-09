@@ -309,8 +309,20 @@ record (`{...obj, dom, active}`); `level.birds` become `BirdEntities`.
   which goes above a laundry line: six small panes instead of four, and the sash pushed up so the bottom
   is dark and open, which is what ties it to the rope below. A window over a washing line is the point;
   washing on a blank wall looks unexplained. This is safe for the sweeper **only while the plain drawing
-  stays the common one** (8 plain against 2 scullery today) — she hides by being an ordinary window, so
+  stays the common one** (11 plain against 2 scullery today) — she hides by being an ordinary window, so
   if variants ever outnumber the plain one she becomes the odd window out.
+- `sign` / `ivy` — the second half's dressing, on the same code path as the three below (the
+  `WALL_FURNITURE` map in `game.js`: type → drawing class, sized from whatever `width`/`height` the
+  data gives). A `sign` is a vertical **neon sign fixed flat to the wall**, its `text` set upright —
+  flat because a blade sign seen side-on is a panel with a level top sticking into the gap, i.e. a
+  ledge. **Magenta**, by elimination: cyan is the checkpoint's colour and warm light is the goal's.
+  It flickers on the tube only (`neonFlicker`), never the board. Keep it out of frame of the goal.
+  With `secret: true` it hides a catnip sushi a meow can shake loose — see Catnip below; keep a ledge
+  under any secret sign, since that is where the roll lands.
+  `ivy` climbs out of the dark at the bottom of the shaft, rooted below the frame, and is the quiet cue
+  that ground exists under a level that no longer draws it. Leaves only — straight stems are vertical
+  lines across the brick courses, the graph-paper trap — on coprime tile sizes, masked into a mound so
+  it has no top edge at all.
 - `downpipe` / `ladder` / `laundry` — level 2's wall furniture, all pure scenery: absent from
   `isSolidType()`/`isSlabType()`, from the meow sweep and from `handleOverlapSystems()`, exactly like
   `window`. Sized from the **data** rather than from CSS, which is the opposite of a `window` (a window
@@ -557,6 +569,8 @@ landing side. Instead every bird must be readable from the ledge above and beate
   3755. Walking *on* the iron is the one case where a bird on a balcony is right: z-index 12 in front
   of the railing is then correct rather than a bug. The rail walker sits at 3983 rather than 3986
   because the pigeon sprite's feet are ~3px above its box bottom, which hovers visibly on a thin rail.
+  The last balcony (above-right of the goal) has a matching rail walker at 263, bookending the level;
+  unlike the first, its patrol does meet the default landing, so it is beaten by timing the drop.
   The 3755 walker patrols the **whole** ledge, slowly: he lands against its wall and leaves by its
   lip, so a half-ledge patrol would always sit on one or the other. Never the starting roof (the
   walk-in locks input). A pigeon on the opposite roof was tried and dropped — a bird he can only reach
@@ -859,6 +873,16 @@ contact through the same `smashesHazards` check — or catnip will silently fail
 Session-only by design — nothing is persisted, and `loadLevel()` calls `disableCatnip()`, so
 both a reload and a restart-after-finishing give you a clean game. The one exception is the
 `?level=N#fast` test URL, which re-arms it *after* `loadLevel()` for exactly that reason.
+
+**It can also be found in the world.** Level 2's SUSHI sign carries `secret: true`: a Sonic Meow with
+the sign on screen rattles it (`.jolted`) and `dropCatnipSushi()` drops a catnip maki roll onto
+whatever slab is under the board — derived, not authored, so the roll can never be left floating.
+Once per run (`secretSpent`). The roll is a runtime-only `sushi` entity in `RuntimeEntities`, picked
+up like a snack; eating it calls `enableCatnip()`, the same entry point as the typed code and `#fast`,
+and plays the same trill. Eating it with catnip already on never toggles it *off*. Because it is the
+same mode, it lasts until the level is reloaded and the HUD hint is what explains it. Everything that
+switches catnip on goes through `enableCatnip()`; everything that switches it off through
+`disableCatnip()`.
 
 ## Level select (two ways in)
 

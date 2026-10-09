@@ -239,8 +239,9 @@ const LEVEL_2 = {
         // the same 50x64 `.wall-window` drawing, so with only her own window in the level she was the
         // one thing on the facade worth looking at.
         //
-        // Coverage: these 8, plus the checkpoint's sash window and the sweeper = 10 of the 21 wall
-        // ledges. It used to be 14, because the four `sill` ledges drew a window of their own; that
+        // Coverage: these 8, plus three more in the second-half block further down, the checkpoint's sash
+        // window and the sweeper = 13 of the 21 wall ledges (the scullery windows hang over ropes, not
+        // ledges). It used to be 14, because the four `sill` ledges drew a window of their own; that
         // variant is gone, so these are now the only ordinary windows in the level and they carry the
         // sweeper's camouflage on their own. If this list ever shrinks, check her first — she is only
         // hidden for as long as an unremarkable window is a common sight on this facade.
@@ -328,7 +329,43 @@ const LEVEL_2 = {
         // does not politely centre itself anyway. The left rope runs 8-104 under a window at 14-76, so it
         // trails off to the right of the opening, which is what a real line does.
         { type: 'window', x: 20,  y: 2420, variant: 'scullery' },
-        { type: 'window', x: 312, y: 3340, variant: 'scullery' }
+        { type: 'window', x: 312, y: 3340, variant: 'scullery' },
+
+        // === The second half's dressing. Below the checkpoint the wall had two windows, one pipe and one
+        // ladder in 2000px, against ten windows, two ropes and a pipe in the first half, and it read as
+        // the artist running out of time. Same rules as everything above: in the bays, clear of the
+        // stone hanging under each ledge, one of a kind per wall per screen.
+        //
+        // Three more plain windows, on ledges that had none, at the usual slab top + 10 and in each
+        // wall's bay. They are also the sweeper's best friends: two of them land within a screen of her,
+        // and an ordinary window is only unremarkable where there are several. Still nothing below 780
+        // but the goal window — 805 is the lowest.
+        { type: 'window', x: 20,  y: 1925 },  // over the balcony at 1915; its railing crosses the glass
+        { type: 'window', x: 312, y: 1795 },  // over the bare ledge at 1785, behind its perched pigeon
+        { type: 'window', x: 20,  y: 805 },   // over the bare ledge at 795, clear of the ladder at x 88
+
+        // A neon sign in the right wall's empty stretch between the awning (1380) and the ledge at 1770,
+        // in the window bay. Visible across the gap from the sweeper's ledge, which is the longest look
+        // at a blank wall in the level. 5 letters of 13px Courier come to ~90px tall, with its cable
+        // hanging 34px below — clear of the awning's top at 1380 and the corbel at 1754. Bumbot would
+        // read it as a promise.
+        // And it keeps it: `secret` means a Sonic Meow with the sign on screen rattles a catnip sushi
+        // roll out of it (dropCatnipSushi), once per run. It falls ~47px onto the awning straight below
+        // (220-400, top 1380) at x~327 — the very next ledge on the route from the sweeper's, from where
+        // the sign is in full view. Spending a snack here is the trade: catnip for the rest of the level
+        // against one meow fewer. Eaten, it switches catnip on there and then.
+        { type: 'sign', x: 325, y: 1440, text: 'SUSHI', secret: true },
+
+        // Ivy climbing out of the dark at the bottom, one patch per wall, rooted below the frame (y -40
+        // is the bottom of the world, the lowest line the camera shows). Both pass BEHIND the ledges that
+        // cross them, at z-index 1.
+        // Right: wide, under the last balcony, topping out at 470 — well short of the 610 balcony's
+        // corbel, so it is not read as holding anything up.
+        { type: 'ivy', x: 286, y: -40, width: 114, height: 510 },
+        // Left: a narrow run up the building's inner corner (x 76-110), beside the goal window rather
+        // than over it — the window's lintel ends at 81 and the window draws in front at z-index 5. Tops
+        // out at 560, under the 780 ledge's corbel.
+        { type: 'ivy', x: 76,  y: -40, width: 34,  height: 600 }
     ],
 
     // The wildlife arrives with the hazard pass: a pigeon perched on a ledge turning its head
@@ -389,6 +426,15 @@ const LEVEL_2 = {
         // (250-400, top 240) at x~340. Covers the bottom of the shaft, which otherwise had only the
         // skimmer below 1025.
         { x: 60,  y: 375,  axis: 'walk', min: 60,  max: 60,  speed: 0, facing: 'right' },
+
+        // Along the top rail of the LAST balcony (250-400, slab top 240), the ledge up and to the right
+        // of the goal window — the same arrangement as the first balcony's rail walker, bookending the
+        // level. y = 240 + the 26px railing - 3 for the sprite's feet. Wall end only (hitbox 306-389):
+        // the walk-off from the gargoyle at 375 lands at x~279-314 and so clips the inner end of its
+        // walk, and a held jump over the perched pigeon up there lands at ~340, squarely in it — so
+        // this one is met on the landing and beaten by timing it. He leaves over the OTHER end of the
+        // railing (x 250) for the sill, so it never stands in the way out.
+        { x: 330, y: 263,  axis: 'walk', min: 300, max: 355, speed: 0.9 },
 
         // Corridor crows, one per section, each a little faster than the last. Their ranges must COVER
         // where he actually is when he falls through their height, not just the middle of the gap: a

@@ -177,6 +177,14 @@ let catnipMode = false;
 let overclocking = false;
 let ghostFrame = 0;   // Rate-limits the afterimage trail
 
+// Shared by the CATNIP code, the `#fast` URL and level 2's catnip sushi, so there is exactly one way
+// in — the mirror of disableCatnip below. No sound: each caller announces it its own way, or not at all.
+function enableCatnip() {
+    catnipMode = true;
+    cat.classList.add('catnip');
+    devPanel.classList.add('visible');
+}
+
 // Shared by the CATNIP toggle and by loadLevel, so there is exactly one teardown path
 function disableCatnip() {
     const wasActive = catnipMode;
@@ -200,10 +208,13 @@ function trackCatnipCode(e) {
     }
 
     catnipBuffer = '';
-    catnipMode = true;
-    cat.classList.add('catnip');
-    devPanel.classList.add('visible');
-    // A rising trill: Bumbot found the good stuff
+    enableCatnip();
+    playCatnipTrill();
+}
+
+// A rising trill: Bumbot found the good stuff. Shared by the typed code and the sushi, so finding it in
+// the world sounds exactly like finding it in the keyboard.
+function playCatnipTrill() {
     playAudioTone(523.25, 'triangle', 0.09);
     setTimeout(() => playAudioTone(698.46, 'triangle', 0.09), 80);
     setTimeout(() => playAudioTone(880, 'triangle', 0.16), 160);
@@ -339,7 +350,7 @@ function rooftopVariant(obj) {
 // --- Themes. Every level declares one, and it decides how shared furniture is *drawn*.
 //
 // This is deliberately separate from `axis`. The axis is a mechanic — which way the camera scrolls,
-// how the level is won, whether the floor is lethal. The theme is presentation. Deriving artwork
+// how the level is won. The theme is presentation. Deriving artwork
 // from the axis would mean a future vertical level in some other setting silently inheriting this
 // one's brickwork and sash windows, so the two must never be conflated: **key look on theme, key
 // behaviour on axis.**
@@ -356,6 +367,16 @@ function portalArt(obj) {
     const theme = THEME_ART[level.theme];
     return (theme && theme.portal) || 'pipe';
 }
+
+// Wall furniture: entity type -> the one CSS class that draws it. Every type here is pure scenery and
+// shares one code path in generateLevel(); `side`, where given, adds `<type>-<side>` for mirroring.
+const WALL_FURNITURE = {
+    downpipe: 'downpipe',
+    ladder:   'fire-ladder',
+    laundry:  'laundry-line',
+    sign:     'neon-sign',
+    ivy:      'ivy'
+};
 
 // A pit is only fatal once Bumbot's centre is past its edge, which keeps the edges
 // forgiving rather than making a 1px overhang deadly.
@@ -610,26 +631,24 @@ function generateLevel() {
             if (obj.variant) element.classList.add('wall-window-' + obj.variant);
             element.style.left = obj.x + 'px';
             element.style.bottom = (40 + obj.y) + 'px';
-        } else if (obj.type === 'downpipe' || obj.type === 'ladder' || obj.type === 'laundry') {
-            // The three pieces of wall furniture that are neither window nor ledge. All pure scenery:
-            // absent from isSolidType()/isSlabType(), from the meow sweep and from
-            // handleOverlapSystems(), exactly like `window`.
+        } else if (WALL_FURNITURE[obj.type]) {
+            // The wall furniture that is neither window nor ledge. All pure scenery: absent from
+            // isSolidType()/isSlabType(), from the meow sweep and from handleOverlapSystems(), exactly
+            // like `window`.
             //
             // Each is sized from the DATA rather than from CSS, which is the opposite of a `window`.
             // A window is fixed in CSS because every window has to be the identical drawing or the
             // sweeper stops hiding among them; these have no twin to match, and a downpipe that cannot
             // choose its own length is useless — running the height of the masonry is the whole point.
-            element.classList.add(obj.type === 'downpipe' ? 'downpipe'
-                                : obj.type === 'ladder'   ? 'fire-ladder'
-                                                          : 'laundry-line');
+            // Whichever dimensions the data gives are used: a rope is measured across, a pipe or ladder
+            // up, a patch of ivy both. A sign gives neither — its text sizes it.
+            element.classList.add(WALL_FURNITURE[obj.type]);
             element.style.left = obj.x + 'px';
             element.style.bottom = (40 + obj.y) + 'px';
-            if (obj.type === 'laundry') {
-                // A rope is measured across; the two vertical ones are measured up.
-                element.style.width = obj.width + 'px';
-            } else {
-                element.style.height = obj.height + 'px';
-            }
+            if (obj.width) element.style.width = obj.width + 'px';
+            if (obj.height) element.style.height = obj.height + 'px';
+            // textContent rather than innerHTML: it is level data, but it is still never markup
+            if (obj.text) element.textContent = obj.text;
             // Which way a ladder's broken bottom hangs, and which way a rope sags towards. Mirrored
             // like a pigeon's facing, so each is authored once.
             if (obj.side) element.classList.add(obj.type + '-' + obj.side);
@@ -819,6 +838,46 @@ function shatterSweeper(ent) {
     playAudioTone(120, 'sawtooth', 0.2);
 }
 
+// A catnip sushi roll falling out of a sign that has just been meowed at. It falls straight down from
+// the bottom of the board and comes to rest on whatever slab is underneath — found here rather than
+// written into the level data, so moving a sign or the ledge below it cannot leave the roll floating.
+// The fall is a CSS animation from the board down to its resting place; the entity sits at the
+// resting place from the first frame, which is harmless because nothing can reach it mid-air in the
+// half second it takes. It joins RuntimeEntities like anything else, so it is cleared with the level
+// and survives a death until he picks it up.
+const sushiWidth = 18;
+const sushiHeight = 13;
+
+function dropCatnipSushi(sign) {
+    sign.secretSpent = true;
+
+    const x = sign.x + 11 - sushiWidth / 2; // Centred under the 22px board
+    const fromY = sign.y - sushiHeight;      // Its top starting at the board's bottom edge
+    let restY = 0;
+    RuntimeEntities.forEach(obj => {
+        if (!obj.active || !isSlabType(obj.type)) return;
+        const top = obj.height + 15;
+        const centre = x + sushiWidth / 2;
+        if (centre < obj.x || centre > obj.x + obj.width || top > fromY) return;
+        if (top > restY) restY = top;
+    });
+
+    // The board rattles and the tube stutters — the read that the meow did something to it
+    sign.dom.classList.add('jolted');
+
+    const el = document.createElement('div');
+    el.classList.add('catnip-sushi', 'level-entity');
+    el.style.left = x + 'px';
+    el.style.bottom = (40 + restY) + 'px';
+    el.style.setProperty('--drop', (fromY - restY) + 'px');
+    world.appendChild(el);
+
+    RuntimeEntities.push({ type: 'sushi', x, y: restY, dom: el, active: true });
+
+    playAudioTone(90, 'sawtooth', 0.18);                       // the transformer buzzing
+    setTimeout(() => playAudioTone(1046.5, 'sine', 0.08), 380); // the roll landing
+}
+
 function vaporizeBird(pig) {
     if (!pig.active) return;
     pig.active = false; // Stops the patrol clamp from resurrecting it
@@ -972,6 +1031,15 @@ function triggerSonicMeow() {
         const exposed = ent.type === 'sweeper' && (ent.state === 'telegraph' || ent.state === 'swing');
         if (ent.type !== 'pillar' && ent.type !== 'spike' && !exposed) return;
         if (onScreen(ent.x, ent.y || 0)) shatterEntity(ent);
+    });
+
+    // The SUSHI sign's secret. The meow does not break a sign — it rattles it, and a catnip roll that
+    // was wedged behind the board drops out. Once per run: `secretSpent` stays set through deaths,
+    // exactly as a collected snack stays collected.
+    RuntimeEntities.forEach(ent => {
+        if (ent.active && ent.type === 'sign' && ent.secret && !ent.secretSpent && onScreen(ent.x, ent.y)) {
+            dropCatnipSushi(ent);
+        }
     });
 
     // Also blast away visible birds
@@ -1130,6 +1198,27 @@ function handleOverlapSystems() {
                 snacks++;
                 energyDisplay.innerText = "Snacks: " + snacks;
                 playAudioTone(880, 'sine', 0.08);
+            }
+        }
+
+        // The catnip sushi from a meowed-at sign. Eating it switches catnip on there and then — the
+        // same mode, HUD and hint line as typing the code, so the hint is what tells him what he got.
+        // Picked up the same generous way as a snack. Eating one with catnip already on changes
+        // nothing but the message; it never toggles it OFF the way the typed code does.
+        if (obj.type === 'sushi') {
+            if (catX < obj.x + sushiWidth && catX + catWidth > obj.x &&
+                catY < obj.y + 25 && catY + catHeight > obj.y) {
+                obj.active = false;
+                obj.dom.remove();
+                enableCatnip();
+                playCatnipTrill();
+
+                meowBubble.innerText = "Catnip sushi!";
+                meowBubble.style.display = 'block';
+                setTimeout(() => {
+                    meowBubble.style.display = 'none';
+                    meowBubble.innerText = "I am Bumbot!!!";
+                }, 1400);
             }
         }
 
@@ -1816,11 +1905,7 @@ if (jumpTo >= 0) {
     startScreen.style.display = 'none';
     loadLevel(jumpTo);
     // loadLevel calls disableCatnip, so the rush has to be re-armed after it, not before
-    if (window.location.hash === '#fast') {
-        catnipMode = true;
-        cat.classList.add('catnip');
-        devPanel.classList.add('visible');
-    }
+    if (window.location.hash === '#fast') enableCatnip();
 } else {
     showStartMenu();
 }

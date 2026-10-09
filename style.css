@@ -1914,7 +1914,7 @@ button.secondary:hover { background: #1b1e2c; color: #aab3c4; }
    Still cold, still never warm — the goal window keeps the only warm light below this roofline.
 
    This must stay the MINORITY drawing. The sweeper hides by being an ordinary `.wall-window`, so the
-   plain version has to remain the one you stop noticing: 8 plain against 2 of these. */
+   plain version has to remain the one you stop noticing: 11 plain against 2 of these. */
 .wall-window-scullery {
     background:
         /* One vertical mullion, two transoms — six panes */
@@ -1926,6 +1926,157 @@ button.secondary:hover { background: #1b1e2c; color: #aab3c4; }
         /* A pane catching the sky, and the room behind going dark */
         linear-gradient(150deg, rgba(150, 178, 214, 0.13) 0 30%, transparent 30%),
         linear-gradient(#1a1d24 0%, #100e12 100%);
+}
+
+/* --- Neon sign: a vertical sign fixed FLAT to the masonry, the one piece of level 1's neon city that
+   reaches down into this street. Flat rather than a blade sign projecting into the gap, because a blade
+   seen side-on is a panel sticking out of the wall with a level top edge — the exact silhouette of a
+   ledge. Flat on the face it is just another thing on the wall, like a window.
+   The text comes from the level data, set vertically and upright. Courier, like the rest of the game.
+   MAGENTA, and the colour is a constraint rather than a taste: cyan is the checkpoint's colour, and warm
+   light belongs to the goal window alone. A neon sign is the brightest thing it can be without stepping
+   on either — and it is placed nowhere near the goal, so the two never share a frame.
+   It flickers, briefly and rarely, because a perfectly steady neon tube reads as a drawing of one. Only
+   the tube flickers; the backing board stays put. */
+.neon-sign {
+    position: absolute;
+    z-index: 1;
+    pointer-events: none;
+    width: 22px;
+    padding: 7px 0;
+    box-sizing: border-box;
+    writing-mode: vertical-rl;
+    text-orientation: upright;
+    font: bold 13px/20px 'Courier New', Courier, monospace;
+    letter-spacing: 2px;
+    text-align: center;
+    color: #ffe0f6; /* the white-hot core of the tube; the colour is all in the glow */
+    text-shadow: 0 0 2px #ff5ad9, 0 0 6px #ff2fc8, 0 0 12px rgba(255, 47, 200, 0.75);
+    /* The backing board: dark painted sheet metal, a bolt at each end */
+    background:
+        radial-gradient(circle 1.5px at 50% 3px, #6a5a66 0 100%, transparent 100%),
+        radial-gradient(circle 1.5px at 50% calc(100% - 3px), #6a5a66 0 100%, transparent 100%),
+        linear-gradient(90deg, #120e14, #1f1822 50%, #110d12);
+    border: 1px solid #3b2f3d;
+    /* The tube's light on the stone around it — kept low, it is a sign on a wall, not a lamp */
+    box-shadow: 0 0 14px rgba(255, 47, 200, 0.20), 0 0 34px rgba(255, 47, 200, 0.10);
+    animation: neonFlicker 9s steps(1, end) infinite;
+}
+/* The power cable, hanging out of the bottom of the board and down the wall. Thin and vertical, so it
+   is the one thing here that could never be read as footing. */
+.neon-sign::after {
+    content: '';
+    position: absolute;
+    top: 100%;
+    left: 50%;
+    width: 2px;
+    height: 34px;
+    margin-left: -1px;
+    background: linear-gradient(#2a2228, #1a1519 70%, transparent);
+}
+@keyframes neonFlicker {
+    0%, 71%, 72.5%, 74%, 100% {
+        color: #ffe0f6;
+        text-shadow: 0 0 2px #ff5ad9, 0 0 6px #ff2fc8, 0 0 12px rgba(255, 47, 200, 0.75);
+    }
+    /* Two quick drop-outs close together, then nine seconds of steady light */
+    71.5%, 73% {
+        color: #5c3d56;
+        text-shadow: 0 0 2px rgba(255, 47, 200, 0.25);
+    }
+}
+/* Meowed at: the board rattles on its bolts and the tube stutters, and that is when the catnip roll
+   drops out of it (dropCatnipSushi). The flicker carries on afterwards, delayed until the rattle ends,
+   because both animate the tube and only one may own it at a time. */
+.neon-sign.jolted {
+    animation: neonJolt 0.7s ease-out, neonFlicker 9s steps(1, end) 0.7s infinite;
+}
+@keyframes neonJolt {
+    0%   { transform: translateX(0) rotate(0deg); }
+    12%  { transform: translateX(-2px) rotate(-2deg); color: #5c3d56; text-shadow: none; }
+    26%  { transform: translateX(2px) rotate(1.5deg);
+           color: #ffe0f6; text-shadow: 0 0 2px #ff5ad9, 0 0 6px #ff2fc8, 0 0 12px rgba(255, 47, 200, 0.75); }
+    40%  { transform: translateX(-1px) rotate(-1deg); color: #5c3d56; text-shadow: none; }
+    55%  { transform: translateX(1px) rotate(0.5deg);
+           color: #ffe0f6; text-shadow: 0 0 2px #ff5ad9, 0 0 6px #ff2fc8, 0 0 12px rgba(255, 47, 200, 0.75); }
+    100% { transform: translateX(0) rotate(0deg); }
+}
+
+/* --- The catnip sushi: a maki roll stood on end, nori round the outside, rice, and a GREEN filling —
+   catnip, in the same green his outline turns when it takes hold, which is the whole hint about what it
+   does. The body is the side of the roll; ::before is the cut face on top, an ellipse because it is seen
+   from slightly above. Glows green like the snack glows red, so it is findable on a dark awning.
+   z-index 3: above the slab it lands on (2), under him (10).
+   Falls from the sign to the slab below via --drop (set in game.js), then bobs like a snack. Both
+   animate transform, so the bob waits for the fall to finish rather than fighting it. */
+.catnip-sushi {
+    position: absolute;
+    z-index: 3;
+    width: 18px;
+    height: 13px;
+    border-radius: 2px 2px 5px 5px;
+    background: linear-gradient(90deg, #0e1510 0%, #23322a 35%, #17221b 70%, #0b110d 100%);
+    filter: drop-shadow(0 0 4px rgba(124, 226, 92, 0.65));
+    animation:
+        sushiDrop 0.45s cubic-bezier(0.55, 0, 1, 0.45),
+        snackBob 1.6s ease-in-out 0.45s infinite alternate;
+}
+.catnip-sushi::before {
+    content: '';
+    position: absolute;
+    left: 0;
+    right: 0;
+    top: -4px;
+    height: 8px;
+    border-radius: 50%;
+    background:
+        radial-gradient(ellipse 4px 2px at 50% 50%, #8fe264 0 55%, #5aa63c 80%, transparent 100%),
+        radial-gradient(ellipse 50% 50% at 50% 50%, #f3f0e6 0 70%, #d4cfc0 76%, #1a261c 80% 100%);
+    background-repeat: no-repeat;
+    background-size: 8px 4px, 100% 100%;
+    background-position: center, center;
+}
+@keyframes sushiDrop {
+    0%   { transform: translateY(calc(var(--drop) * -1)); }
+    75%  { transform: translateY(0); }
+    88%  { transform: translateY(-4px); }
+    100% { transform: translateY(0); }
+}
+
+/* --- Ivy: climbing up out of the dark at the bottom of the shaft. The street is no longer drawn, so
+   the walls simply run off the bottom of the frame; ivy rooted somewhere below the frame is the quiet
+   cue that there IS ground down there, a long way under the last sill.
+   Leaves only, no stems. Straight vine stems are vertical lines on the masonry, and vertical lines
+   crossing the brick courses are what made the first wall read as graph paper.
+   Each leaf layer tiles on its own size, and the sizes are pairwise coprime (23/29/31/37/43 by
+   19/23/37/29/47) — the skyline's trick — so the clusters never line up into a visible repeat.
+   Dark and desaturated: at night, in a shaft lit from far above, foliage is a few points off the stone.
+   The mask rounds the top into a mound and lets the leaves thin out towards it, so there is no edge —
+   and certainly no flat, pale top — anywhere on it.
+
+   It is BACKGROUND, and the first cut forgot that: leaves up to luminance ~85 against a wall of ~11-39,
+   a pale highlight layer on top, and thin foliage between them, so every leaf stood alone and the patch
+   read as a sheet of bright green polka dots — more prominent than the ledges in front of it. Now the
+   dark mass is the bulk of it and the leaves sit only a few points above that mass, with no highlights,
+   so the eye gets texture rather than a pattern of spots. */
+.ivy {
+    position: absolute;
+    z-index: 1;
+    pointer-events: none;
+    opacity: 0.8;
+    background:
+        radial-gradient(ellipse 4px 3px at 5px 6px, #28321f 0 70%, transparent 100%),
+        radial-gradient(ellipse 5px 4px at 15px 12px, #222b1c 0 70%, transparent 100%),
+        radial-gradient(ellipse 4px 5px at 9px 20px, #263020 0 70%, transparent 100%),
+        radial-gradient(ellipse 6px 4px at 21px 4px, #1f281a 0 70%, transparent 100%),
+        radial-gradient(ellipse 5px 3px at 26px 26px, #242e1e 0 70%, transparent 100%),
+        /* The mass of foliage the leaves sit in — big, overlapping, and most of what you see */
+        radial-gradient(ellipse 18px 12px at 12px 18px, rgba(17, 22, 15, 0.9) 0 60%, transparent 100%),
+        radial-gradient(ellipse 16px 18px at 30px 8px, rgba(19, 25, 16, 0.85) 0 60%, transparent 100%),
+        radial-gradient(ellipse 20px 14px at 20px 34px, rgba(15, 20, 13, 0.85) 0 60%, transparent 100%);
+    background-size: 23px 19px, 29px 23px, 31px 37px, 37px 29px, 43px 47px, 29px 31px, 37px 41px, 41px 43px;
+    -webkit-mask-image: radial-gradient(ellipse 75% 100% at 50% 100%, #000 0 58%, transparent 100%);
+    mask-image: radial-gradient(ellipse 75% 100% at 50% 100%, #000 0 58%, transparent 100%);
 }
 
 /* --- The broom-sweeper: an old woman who looks like a shuttered window until Bumbot gets close,
